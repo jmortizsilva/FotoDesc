@@ -1,0 +1,53 @@
+{
+  "id": "443c15d5-c610-48cc-98af-29441cdec18f",
+  "status": "ERRORED",
+  "platform": "IOS",
+  "error": {
+    "errorCode": "UNKNOWN_CUSTOM_BUILD_ERROR",
+    "message": "Unknown custom build error. See logs for more information."
+  },
+  "artifacts": {
+    "xcodeBuildLogsUrl": "https://job-logs.eascdn.net/production-xcode-logs/443c15d5-c610-48cc-98af-29441cdec18f?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260304%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260304T201646Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=8e7b45f2d099ea420846c922ebae75a9666dd053a55394f9445baa1e1d055672c1ee73631de3f27d6fd298286e92643bc16179340b5cbc3cd56a065fd3a1cd079647b6c2399540ff20e91dc0ed5bc38e66668853d7ed7d48f66ddf325338a27f1ee5d939e1b4fcc90d8e209cb35e1516ca8b5d7a68518969a6f700f33e33acfcef46b8d26eaf59753a2cecce617a0ee804ef8d4ff2b292d6bac41b65351932462fd591b0115601b172a3d3ebb49e56fe9af6f511206c4a4477e99c4952898b1c62400cfe053bed105f3017308b2f955ef9af745833e9046d604e438cef2e7375f8be0ec88057625ef2aaa4a24e0083bbee9c41c473270411617449fd720179c1"
+  },
+  "fingerprint": {
+    "id": "019cb9ec-2273-7b99-9700-6cf437801454",
+    "hash": "c0931af6ec756fbffd4d04bb90bea68616b1e12c"
+  },
+  "initiatingActor": {
+    "id": "efa54f0f-5d0d-4536-9fa0-03a28f852962",
+    "displayName": "jmortizsilva"
+  },
+  "logFiles": [
+    "https://job-logs.eascdn.net/production/443c15d5-c610-48cc-98af-29441cdec18f/1772649902151-4c4a9bcd-474a-4d8b-8634-5ad935d813c8.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260304%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260304T201646Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=61b4c4d0169a3c86e7374fe6c88147523e14c83dfe7f0152b305dfca792daaf4ae8761010f849414262b4b65527c601929a347da1646612d07c874dd248192a0576433aa18a020d5c76048a6843d66fd682d2e576abe1822660d49e2714556e0d63dcc5e8196eacb07bffd8620c1a65152466f1c65d29ae637b15605216dd82ad22710a7e6686b3d8a2f199bb85a893edee768f410e4a48a532a20ed8d1129ee5a2cbb4f73f16d6916ff379d8a44b2862b4a9074d3af8097f5aa42927c1b2445fbfd161c95b8eb0569f9d1705a2dfb5a3c3b1c417ad423399e6242b33a5d0d69d99fdba91212363b28d724fef02a2389c7a4ce678085d6d31f72429fed309975",
+    "https://job-logs.eascdn.net/production/443c15d5-c610-48cc-98af-29441cdec18f/1772653535579-ba45e6c6-8fbc-4969-b59e-b5732121eac7.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260304%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260304T201646Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=55dc393439f32acf537a8cf75831b7c8094890c2825bc1a82c521df4895f17175c035b3fe3410cdb6e5450d9dd2e9a041d81926d74825addeea972841fe2606456ff158520eb7da996a74323fc9abd3e70771a5dffcf2cf77d4c7803fb7eea9d1ec7fec5b31b843b432f8d165c0a6b78a1d789af3479cf58e79e0bc8a16f82175989ae406cbbc3293fe2e5fcf45a9a0904907b853b2e020583d3833ff104c82b593037c8bbb19390877e1782135bdf0f2b76feb80a42495d78d2754962fbcbf7f42ee9e28822b225d277f6cb71a1478fafc3f5daf169b98a27322259fb8cbbb0a507701a19ddbccc2ac3c7317209851f7ad3d290f901036bc0d7420f85911792",
+    "https://job-logs.eascdn.net/production/443c15d5-c610-48cc-98af-29441cdec18f/1772653535804-bb5a3e5f-ff71-479a-b202-26ce864900d9.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260304%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260304T201646Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=171c820938c8892f25fa480c01b444d2c93d8c27704ada8f5df185ca5b775f20207d10497757b21c8b1a7df11afd0ad8646c01cf37de1bba9f6d7dc9dbe051317a03b26d3a81d2d435b391f1c14112d4abae79fa6c8bd29d62905487da6c18dbfb4cab434a734562ede413efc005a3a3886697ced2e0aa0b3b2cc1da7be9193adbf8ead9c698460f5f4c1cf6481a996d0a1bb92cf9e4a90aea8132f934da8f307b39a71a934518a3686a6beb33d964999bda6efc66a21783352e89c59f0d9c4d416f3db2916e5650c2a84788457a02e0b0ce74db05cfb9584bf59b355059e658c9ee4a0eebddfd94c3eef6f4276e15129a49a925bd8cc674b3fc4b6fd819227e",
+    "https://job-logs.eascdn.net/production/443c15d5-c610-48cc-98af-29441cdec18f/1772653535993-0b28f3b2-a602-4f13-9ec4-56bd00283742.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260304%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260304T201646Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=82e423a2cde1acf9da9e15234a433fd18fe5803d4fc12e8b71c9f2496f8a790eba14f74fa9b0f2724a44898d00ebbf860ca16b87ec1870e3149a522e6ae908555a1f13b977b657bf9e7432112391ecca196fccc3edcda1f59f28a018178108d98cfc575cab0e3d8461a0f054075ce2a981177656ac3d0d8425f19ae92d9418b85224f8fb171721b8910f99fcde90873f977961b7bd363bc9de0e65411af1151113e82ec08da59db343a70f47293b5a68fa63c28887d6ffff26f1e64b21ced5833129c05d8ec8c037db530e8b0023ef81aca1ead328f86b8f12a01c5b46522248a78ce8f122f699dbe63cd7b18f24556a3126bc9e2a74ecbdc284c55f9247255d"
+  ],
+  "project": {
+    "id": "302c90df-b06b-4f5a-aa5e-5df7f9d647b3",
+    "name": "fotodesc",
+    "slug": "fotodesc",
+    "ownerAccount": {
+      "id": "d4009036-ed8a-4bcf-8d63-4157e44b2261",
+      "name": "jmortizsilva"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "sdkVersion": "54.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "1",
+  "gitCommitHash": "01a64c25cbc0ba5ac53eae2d1bce87a9a8399721",
+  "gitCommitMessage": "Primera versi├│n de FotoDesc para iOS",
+  "priority": "NORMAL",
+  "createdAt": "2026-03-04T18:45:01.792Z",
+  "updatedAt": "2026-03-04T19:46:43.091Z",
+  "completedAt": "2026-03-04T19:46:40.262Z",
+  "expirationDate": "2026-03-18T18:45:01.883Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 231,
+    "buildQueueTime": 3678167,
+    "buildDuration": 15909
+  }
+}

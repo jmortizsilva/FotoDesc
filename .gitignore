@@ -60,3 +60,10 @@ coverage/
 *.swo
 *~
 .tmp/
+
+# EAS custom build configs (force include even if ignored globally)
+!.eas/
+!.eas/project.json
+!.eas/build/
+!.eas/build/*.yml
+!.eas/build/*.yaml

@@ -1,0 +1,16 @@
+build:
+  name: iOS bare store build
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - run:
+        name: Install pods
+        working_directory: ./ios
+        command: chmod -R u+w . && NO_FLIPPER=1 pod install
+    - eas/configure_ios_credentials
+    - eas/configure_ios_version
+    - eas/generate_gymfile_from_template:
+        inputs:
+          credentials: ${ eas.job.secrets.buildCredentials }
+    - eas/run_fastlane
+    - eas/find_and_upload_build_artifacts

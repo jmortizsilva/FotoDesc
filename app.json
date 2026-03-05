@@ -5,5 +5,11 @@
     "eas": {
       "projectId": "302c90df-b06b-4f5a-aa5e-5df7f9d647b3"
     }
+  },
+  "ios": {
+    "bundleIdentifier": "com.jmortizsilva.fotodesc",
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false
+    }
   }
 }
