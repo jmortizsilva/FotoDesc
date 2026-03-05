@@ -102,11 +102,11 @@ RCT_REMAP_METHOD(requestPhotoLibraryPermission,
         [PHPhotoLibrary requestAuthorizationForAccessLevel:PHAccessLevelReadWrite handler:^(PHAuthorizationStatus newStatus) {
           BOOL granted = (newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited);
           resolve(@(granted));
-              }
-              default:
-                resolve(@(NO));
-                break;
         }];
+        break;
+      }
+      default:
+        resolve(@(NO));
         break;
     }
   } else {
@@ -123,9 +123,9 @@ RCT_REMAP_METHOD(requestPhotoLibraryPermission,
       case PHAuthorizationStatusNotDetermined: {
         [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus newStatus) {
           resolve(@(newStatus == PHAuthorizationStatusAuthorized));
-          }
         }];
         break;
+      }
       default:
         resolve(@(NO));
         break;
