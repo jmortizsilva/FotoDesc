@@ -152,18 +152,19 @@ RCT_REMAP_METHOD(getAllPhotos,
     
     [assets enumerateObjectsUsingBlock:^(PHAsset * _Nonnull asset, NSUInteger idx, BOOL * _Nonnull stop) {
       [self assetToDictionary:asset completion:^(NSDictionary *photoDict) {
-        if (photoDict) {
-          @synchronized(photos) {
+        @synchronized(photos) {
+          if (photoDict) {
             [photos addObject:photoDict];
           }
-        }
-        remaining--;
-        if (remaining == 0) {
-          // Sort by creation date descending before returning
-          NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-            return [b[@"creationDate"] compare:a[@"creationDate"]];
-          }];
-          resolve(sorted);
+
+          remaining--;
+          if (remaining == 0) {
+            // Sort by creation date descending before returning
+            NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+              return [b[@"creationDate"] compare:a[@"creationDate"]];
+            }];
+            resolve(sorted);
+          }
         }
       }];
     }];
@@ -189,17 +190,18 @@ RCT_REMAP_METHOD(getPhotosWithDescription,
     
     [assets enumerateObjectsUsingBlock:^(PHAsset * _Nonnull asset, NSUInteger idx, BOOL * _Nonnull stop) {
       [self assetToDictionary:asset completion:^(NSDictionary *photoDict) {
-        if (photoDict && [photoDict[@"hasDescription"] boolValue]) {
-          @synchronized(photos) {
+        @synchronized(photos) {
+          if (photoDict && [photoDict[@"hasDescription"] boolValue]) {
             [photos addObject:photoDict];
           }
-        }
-        remaining--;
-        if (remaining == 0) {
-          NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-            return [b[@"creationDate"] compare:a[@"creationDate"]];
-          }];
-          resolve(sorted);
+
+          remaining--;
+          if (remaining == 0) {
+            NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+              return [b[@"creationDate"] compare:a[@"creationDate"]];
+            }];
+            resolve(sorted);
+          }
         }
       }];
     }];
@@ -225,17 +227,18 @@ RCT_REMAP_METHOD(getPhotosWithoutDescription,
     
     [assets enumerateObjectsUsingBlock:^(PHAsset * _Nonnull asset, NSUInteger idx, BOOL * _Nonnull stop) {
       [self assetToDictionary:asset completion:^(NSDictionary *photoDict) {
-        if (photoDict && ![photoDict[@"hasDescription"] boolValue]) {
-          @synchronized(photos) {
+        @synchronized(photos) {
+          if (photoDict && ![photoDict[@"hasDescription"] boolValue]) {
             [photos addObject:photoDict];
           }
-        }
-        remaining--;
-        if (remaining == 0) {
-          NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-            return [b[@"creationDate"] compare:a[@"creationDate"]];
-          }];
-          resolve(sorted);
+
+          remaining--;
+          if (remaining == 0) {
+            NSArray *sorted = [photos sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+              return [b[@"creationDate"] compare:a[@"creationDate"]];
+            }];
+            resolve(sorted);
+          }
         }
       }];
     }];
