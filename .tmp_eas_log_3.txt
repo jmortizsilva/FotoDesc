@@ -1,3 +1,0 @@
-{"name":"turtle-launcher","hostname":"launcher-ios-6455495f95-ps5fj","pid":1,"service":"launcher","phase":"SPIN_UP_BUILDER","level":30,"marker":"START_PHASE","msg":"Start phase: SPIN_UP_BUILDER","time":"2026-03-04T21:59:25.837Z","v":0}
-{"name":"turtle-launcher","hostname":"launcher-ios-6455495f95-ps5fj","pid":1,"service":"launcher","phase":"SPIN_UP_BUILDER","level":30,"workerName":"turtle-worker-ea46658e9e","msg":"Creating new worker instance","time":"2026-03-04T21:59:25.838Z","v":0}
-
