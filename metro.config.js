@@ -1,11 +1,12 @@
-/**
- * Metro configuration for React Native
- * https://github.com/facebook/react-native
- *
- * @format
- */
+const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
-module.exports = {
+/**
+ * Metro config that extends React Native defaults.
+ * Keeping defaults avoids asset pipeline regressions in CI/EAS builds.
+ */
+const defaultConfig = getDefaultConfig(__dirname);
+
+const config = {
   transformer: {
     getTransformOptions: async () => ({
       transform: {
@@ -15,3 +16,5 @@ module.exports = {
     }),
   },
 };
+
+module.exports = mergeConfig(defaultConfig, config);

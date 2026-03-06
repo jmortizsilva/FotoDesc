@@ -5,6 +5,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {TouchableOpacity, Text} from 'react-native';
 import GalleryScreen from './screens/GalleryScreen';
 import PhotoDetailScreen from './screens/PhotoDetailScreen';
+import LocationEditorScreen from './screens/LocationEditorScreen';
 import SettingsScreen from './screens/SettingsScreen';
 
 const Stack = createStackNavigator();
@@ -36,6 +37,8 @@ const App = () => {
             headerTitleStyle: {
               fontWeight: 'bold',
             },
+            headerBackTitle: 'Atrás',
+            headerBackAccessibilityLabel: 'Atrás',
           }}>
           <Stack.Screen
             name="Gallery"
@@ -49,6 +52,11 @@ const App = () => {
             name="PhotoDetail"
             component={PhotoDetailScreen}
             options={{title: 'Detalle de Foto'}}
+          />
+          <Stack.Screen
+            name="LocationEditor"
+            component={LocationEditorScreen}
+            options={{title: 'Editar ubicación'}}
           />
           <Stack.Screen
             name="Settings"

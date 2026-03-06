@@ -33,7 +33,7 @@ export class OpenAIService {
       const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
-          model: 'gpt-4-vision-preview',
+          model: 'gpt-4.1-mini',
           messages: [
             {
               role: 'user',
@@ -66,6 +66,10 @@ export class OpenAIService {
       console.error('Error generating description:', error);
       if (error.response?.status === 401) {
         throw new Error('API Key inválida');
+      }
+      const apiMessage = error.response?.data?.error?.message;
+      if (apiMessage) {
+        throw new Error(apiMessage);
       }
       throw new Error('Error al generar descripción con IA');
     }

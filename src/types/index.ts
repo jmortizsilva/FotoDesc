@@ -7,6 +7,8 @@ export interface PhotoAsset {
   width: number;
   height: number;
   creationDate: string;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
   imageDescription?: string;
   hasDescription: boolean;
 }

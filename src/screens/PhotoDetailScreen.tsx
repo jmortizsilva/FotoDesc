@@ -11,32 +11,134 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  InputAccessoryView,
+  Share,
 } from 'react-native';
-import PhotoMetadataManager, {PhotoAsset} from '../modules/PhotoMetadataManager';
+import {useFocusEffect} from '@react-navigation/native';
+import PhotoMetadataManager, {
+  PhotoAsset,
+  PhotoLocation,
+} from '../modules/PhotoMetadataManager';
 import OpenAIService from '../services/OpenAIService';
 
 const PhotoDetailScreen = ({route, navigation}: any) => {
   const {photo: initialPhoto} = route.params as {photo: PhotoAsset};
-  const [photo, setPhoto] = useState<PhotoAsset>(initialPhoto);
+  const [photo] = useState<PhotoAsset>(initialPhoto);
   const [description, setDescription] = useState(initialPhoto.imageDescription || '');
+  const [address, setAddress] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [isPreparingAsset, setIsPreparingAsset] = useState(false);
+  const [saveErrorDiagnostic, setSaveErrorDiagnostic] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Cargar la descripción actualizada al entrar
-    loadDescription();
-  }, []);
+  const descriptionAccessoryId = 'descriptionAccessory';
+
+  const formatCoordinatesFallback = (lat: number, lon: number) =>
+    `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+  const buildSaveDiagnostic = (error: any) => {
+    const errorCode = error?.code || 'UNKNOWN';
+    const nativeMessage =
+      error?.message || error?.nativeStackIOS?.[0] || 'Sin detalle nativo';
+
+    return [
+      'Diagnóstico de guardado',
+      `assetId: ${photo.id}`,
+      `filename: ${photo.filename}`,
+      `code: ${errorCode}`,
+      `message: ${nativeMessage}`,
+    ].join('\n');
+  };
+
+  const resolveFriendlyAddress = async (lat: number, lon: number) => {
+    setIsResolvingLocation(true);
+    try {
+      const reverseAddress = await PhotoMetadataManager.reverseGeocodeLocation(
+        lat,
+        lon,
+      );
+      if (reverseAddress && reverseAddress.trim().length > 0) {
+        setAddress(reverseAddress);
+      } else {
+        setAddress(formatCoordinatesFallback(lat, lon));
+      }
+    } catch {
+      setAddress(formatCoordinatesFallback(lat, lon));
+    } finally {
+      setIsResolvingLocation(false);
+    }
+  };
+
+  const prepareAssetForEditing = async () => {
+    setIsPreparingAsset(true);
+    try {
+      await PhotoMetadataManager.prepareAssetForEditing(photo.id);
+    } catch (error: any) {
+      const diagnostic = buildSaveDiagnostic(error);
+      setSaveErrorDiagnostic(diagnostic);
+      Alert.alert(
+        'No se pudo preparar la foto',
+        'La foto no está lista para editar metadatos. Revisa conexión y que esté descargada desde iCloud.',
+      );
+    } finally {
+      setIsPreparingAsset(false);
+    }
+  };
+
+  const handleShareDiagnostic = async () => {
+    if (!saveErrorDiagnostic) {
+      return;
+    }
+
+    try {
+      await Share.share({
+        title: 'Diagnóstico FotoDesc',
+        message: saveErrorDiagnostic,
+      });
+    } catch {
+      Alert.alert('Error', 'No se pudo compartir el diagnóstico');
+    }
+  };
 
   const loadDescription = async () => {
     try {
       const desc = await PhotoMetadataManager.getImageDescription(photo.id);
-      if (desc) {
-        setDescription(desc);
-      }
+      setDescription(desc || '');
     } catch (error) {
       console.error('Error loading description:', error);
     }
   };
+
+  const loadLocation = async () => {
+    try {
+      const location = (await PhotoMetadataManager.getPhotoLocation(
+        photo.id,
+      )) as PhotoLocation | null;
+
+      if (location) {
+        await resolveFriendlyAddress(location.latitude, location.longitude);
+      } else {
+        setAddress('Sin datos de ubicación');
+      }
+    } catch (error) {
+      console.error('Error loading location:', error);
+      setAddress('No se pudo leer la ubicación');
+    }
+  };
+
+  useEffect(() => {
+    prepareAssetForEditing();
+    loadDescription();
+    loadLocation();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDescription();
+      loadLocation();
+    }, []),
+  );
 
   const handleSaveDescription = async () => {
     if (!description.trim()) {
@@ -44,7 +146,13 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
       return;
     }
 
+    if (isPreparingAsset) {
+      Alert.alert('Espera', 'La foto todavía se está preparando para edición.');
+      return;
+    }
+
     setIsSaving(true);
+    setSaveErrorDiagnostic(null);
     try {
       const success = await PhotoMetadataManager.setImageDescription(
         photo.id,
@@ -52,55 +160,48 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
       );
 
       if (success) {
-        Alert.alert(
-          'Guardado',
-          'La descripción se ha guardado correctamente',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ],
-        );
+        Alert.alert('Guardado', 'La descripción se ha guardado correctamente', [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]);
       } else {
         Alert.alert('Error', 'No se pudo guardar la descripción');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Error al guardar la descripción');
+    } catch (error: any) {
+      const errorCode = error?.code ? ` (${error.code})` : '';
+      const nativeMessage =
+        error?.message ||
+        error?.nativeStackIOS?.[0] ||
+        'Error desconocido al guardar';
+      const diagnostic = buildSaveDiagnostic(error);
+
+      console.error('Error saving description', {
+        assetId: photo.id,
+        filename: photo.filename,
+        error,
+      });
+
+      setSaveErrorDiagnostic(diagnostic);
+
+      Alert.alert(
+        'Error al guardar',
+        `No se pudo guardar la descripción en la foto original${errorCode}.\n\nDetalle: ${nativeMessage}\n\nUsa el botón "Compartir diagnóstico" para enviarme el error completo.`,
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleGenerateWithAI = async () => {
-    Alert.alert(
-      'Generar con IA',
-      '¿Deseas generar una descripción automática con OpenAI? Esto consumirá créditos de tu API.',
-      [
-        {text: 'Cancelar', style: 'cancel'},
-        {text: 'Generar', onPress: generateDescription},
-      ],
-    );
-  };
-
   const generateDescription = async () => {
     setIsGenerating(true);
     try {
-      // Obtener la imagen en base64 (tamaño máximo 1MB para la API)
-      const imageBase64 = await PhotoMetadataManager.getImageBase64(
-        photo.id,
-        1024,
-      );
-
+      const imageBase64 = await PhotoMetadataManager.getImageBase64(photo.id, 1024);
       const generatedDesc = await OpenAIService.generateImageDescription(
         imageBase64,
       );
-
       setDescription(generatedDesc);
-      Alert.alert(
-        'Descripción generada',
-        'Puedes revisar y editar la descripción antes de guardar',
-      );
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Error al generar descripción');
     } finally {
@@ -117,49 +218,89 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: confirmDelete,
+          onPress: async () => {
+            try {
+              const success = await PhotoMetadataManager.deletePhoto(photo.id);
+              if (success) {
+                Alert.alert('Eliminada', 'La foto se ha eliminado correctamente', [
+                  {text: 'OK', onPress: () => navigation.goBack()},
+                ]);
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar la foto');
+              }
+            } catch {
+              Alert.alert('Error', 'Error al eliminar la foto');
+            }
+          },
         },
       ],
     );
-  };
-
-  const confirmDelete = async () => {
-    try {
-      const success = await PhotoMetadataManager.deletePhoto(photo.id);
-      if (success) {
-        Alert.alert('Eliminada', 'La foto se ha eliminado correctamente', [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]);
-      } else {
-        Alert.alert('Error', 'No se pudo eliminar la foto');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Error al eliminar la foto');
-    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
         <Image
           source={{uri: photo.uri}}
           style={styles.image}
-          accessibilityLabel={description || 'Imagen sin descripción'}
+          accessibilityLabel={
+            description && description.trim().length > 0
+              ? `${description}. ${new Date(
+                  photo.creationDate,
+                ).toLocaleString('es-ES')}`
+              : `Sin descripción. ${new Date(
+                  photo.creationDate,
+                ).toLocaleString('es-ES')}`
+          }
         />
 
         <View style={styles.infoContainer}>
-          <Text style={styles.label}>Nombre del archivo:</Text>
-          <Text style={styles.value}>{photo.filename}</Text>
+          {(isGenerating || isResolvingLocation || isPreparingAsset) && (
+            <View style={styles.waitingBox}>
+              <ActivityIndicator color="#007AFF" />
+              <Text style={styles.waitingText}>
+                {isPreparingAsset
+                  ? 'Preparando foto para edición...'
+                  : isGenerating
+                  ? 'Generando descripción...'
+                  : 'Resolviendo ubicación...'}
+              </Text>
+            </View>
+          )}
+
+          {saveErrorDiagnostic && (
+            <View style={styles.diagnosticBox}>
+              <Text style={styles.diagnosticTitle}>Se detectó un error al guardar</Text>
+              <TouchableOpacity
+                style={[styles.button, styles.buttonSecondary, styles.singleButton]}
+                onPress={handleShareDiagnostic}
+                accessibilityRole="button"
+                accessibilityLabel="Compartir diagnóstico del error de guardado">
+                <Text style={styles.buttonTextSecondary}>Compartir diagnóstico</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <Text style={styles.label}>Fecha:</Text>
           <Text style={styles.value}>
-            {new Date(photo.creationDate).toLocaleDateString('es-ES')}
+            {new Date(photo.creationDate).toLocaleString('es-ES')}
           </Text>
+
+          <Text style={styles.label}>Ubicación:</Text>
+          <Text style={styles.value}>{address || 'Sin datos de ubicación'}</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.buttonSecondary, styles.singleButton]}
+            onPress={() => navigation.navigate('LocationEditor', {photo})}
+            disabled={isPreparingAsset}
+            accessibilityRole="button"
+            accessibilityLabel="Editar ubicación">
+            <Text style={styles.buttonTextSecondary}>Editar ubicación</Text>
+          </TouchableOpacity>
 
           <Text style={styles.label}>Descripción accesible:</Text>
           <TextInput
@@ -170,15 +311,19 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
             onChangeText={setDescription}
             placeholder="Añade una descripción para VoiceOver..."
             placeholderTextColor="#999"
+            editable={!isPreparingAsset}
             accessibilityLabel="Campo de descripción"
             accessibilityHint="Escribe la descripción de la imagen para accesibilidad"
+            inputAccessoryViewID={
+              Platform.OS === 'ios' ? descriptionAccessoryId : undefined
+            }
           />
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.buttonPrimary]}
               onPress={handleSaveDescription}
-              disabled={isSaving}
+              disabled={isSaving || isPreparingAsset}
               accessibilityLabel="Guardar descripción"
               accessibilityRole="button">
               {isSaving ? (
@@ -190,8 +335,8 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
 
             <TouchableOpacity
               style={[styles.button, styles.buttonSecondary]}
-              onPress={handleGenerateWithAI}
-              disabled={isGenerating}
+              onPress={generateDescription}
+              disabled={isGenerating || isPreparingAsset}
               accessibilityLabel="Generar descripción con inteligencia artificial"
               accessibilityRole="button">
               {isGenerating ? (
@@ -211,6 +356,25 @@ const PhotoDetailScreen = ({route, navigation}: any) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID={descriptionAccessoryId}>
+          <View style={styles.accessoryBar}>
+            <TouchableOpacity
+              style={[styles.button, styles.buttonPrimary, styles.accessoryButton]}
+              onPress={handleSaveDescription}
+              disabled={isSaving || isPreparingAsset}
+              accessibilityLabel="Guardar descripción"
+              accessibilityRole="button">
+              {isSaving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Guardar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </InputAccessoryView>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -279,6 +443,49 @@ const styles = StyleSheet.create({
   buttonDanger: {
     backgroundColor: '#FF3B30',
     marginTop: 10,
+  },
+  singleButton: {
+    marginTop: 10,
+  },
+  waitingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#eef6ff',
+    borderWidth: 1,
+    borderColor: '#cfe5ff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  waitingText: {
+    color: '#175ea8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  diagnosticBox: {
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#FFF4F4',
+    borderColor: '#F5C2C2',
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  diagnosticTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8A1C1C',
+    marginBottom: 8,
+  },
+  accessoryBar: {
+    backgroundColor: '#f2f2f7',
+    borderTopWidth: 1,
+    borderTopColor: '#d9d9de',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accessoryButton: {
+    minHeight: 42,
   },
   buttonText: {
     color: '#fff',
