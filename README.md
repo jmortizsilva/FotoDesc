@@ -12,3 +12,25 @@ Se que en iOS existe una manera para añadirle descripción a las imágenes, per
 Basándome en esta idea de mi amigo Ramón y con la ayuda de Chat GPT y alguna otra persona por ahí, he conseguido realizar esta aplicación que permite ya no solo la edición de la descripción, si no la edición de la geolocalización mediante los datos de latitud y longitud, además de obtener una descripción automática utilizando la API de Open AI.
 
 Gracias, Ramón y al resto de personas que han contribuido en que esto sea funcional y sirva.
+
+## Ejecutarla desde el código
+
+Hace falta Python 3.9 o posterior.
+
+```
+python -m venv .venv
+.venv\Scripts\activate        (en Mac: source .venv/bin/activate)
+pip install -r requirements.txt
+python fotodesc.py
+```
+
+Para pasar las pruebas: `pip install -r requirements-desarrollo.txt` y después `python -m pytest`.
+
+## Estructura
+
+- `fotodesc.py`: arranque.
+- `logica/`: metadatos de las fotos y coordenadas. No depende de la interfaz y tiene sus pruebas en `logica/pruebas/`.
+- `ia/`: la petición de descripción al servicio de IA, con pruebas en `ia/pruebas/`.
+- `interfaz/`: ventanas y diálogos.
+
+El ejecutable para Windows se publica como descarga en la página de versiones de GitHub, no dentro del repositorio.
