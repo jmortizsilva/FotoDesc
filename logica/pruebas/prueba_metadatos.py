@@ -62,3 +62,31 @@ def prueba_archivo_que_no_es_imagen_devuelve_vacio(tmp_path):
     ruta = tmp_path / "nota.jpg"
     ruta.write_text("no soy una foto")
     assert metadatos.leer_metadatos(str(ruta)) == metadatos.Metadatos()
+
+
+def prueba_guardar_no_recomprime_la_imagen(tmp_path):
+    ruta = tmp_path / "foto.jpg"
+    Image.new("RGB", (64, 64), "red").save(ruta, "jpeg", quality=95)
+
+    def datos_de_imagen():
+        # Lo que va después del EXIF: si cambia, se ha recomprimido.
+        contenido = ruta.read_bytes()
+        return contenido[contenido.index(b"\xff\xdb"):]
+
+    antes = datos_de_imagen()
+    for texto in ("primera", "segunda", "tercera"):
+        exif = metadatos.leer_exif(str(ruta))
+        metadatos.poner_descripcion(exif, texto)
+        metadatos.guardar_exif(str(ruta), exif)
+    assert datos_de_imagen() == antes
+    assert metadatos.leer_metadatos(str(ruta)).descripcion == "tercera"
+
+
+def prueba_png_se_rechaza_sin_tocar_el_archivo(tmp_path):
+    ruta = tmp_path / "captura.png"
+    Image.new("RGB", (8, 8), "white").save(ruta, "png")
+    original = ruta.read_bytes()
+    with pytest.raises(metadatos.FormatoNoSoportado):
+        metadatos.guardar_exif(str(ruta), metadatos.exif_vacio())
+    assert ruta.read_bytes() == original
+    assert [p.name for p in tmp_path.iterdir()] == ["captura.png"]

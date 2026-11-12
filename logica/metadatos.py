@@ -3,6 +3,9 @@
 Las funciones que trabajan sobre el diccionario EXIF son puras; solo `leer_exif`,
 `guardar_exif` y `leer_metadatos` tocan el disco.
 """
+import io
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -26,6 +29,13 @@ class Metadatos:
     gps: Optional[Tuple[float, float]] = None
     fecha: str = ""  # DD/MM/AAAA
     hora: str = ""   # HH:MM:SS
+
+
+class FormatoNoSoportado(Exception):
+    """Solo se escriben metadatos en JPEG; en otros formatos se rechaza antes de tocar el archivo."""
+
+    def __init__(self):
+        super().__init__("Por ahora solo se pueden guardar datos en fotos JPG.")
 
 
 def exif_vacio():
@@ -118,9 +128,38 @@ def leer_exif(ruta):
     return exif_vacio()
 
 
+def es_jpeg(datos):
+    return datos[:2] == b"\xff\xd8"
+
+
+def insertar_exif(datos, exif):
+    """Devuelve los bytes del JPEG con el EXIF sustituido, sin tocar la imagen.
+
+    La versión 1.0 guardaba con Image.save(), que recomprimía la foto con calidad 75
+    y quitaba el perfil de color en cada guardado.
+    """
+    if not es_jpeg(datos):
+        raise FormatoNoSoportado()
+    salida = io.BytesIO()
+    piexif.insert(piexif.dump(exif), datos, salida)
+    return salida.getvalue()
+
+
 def guardar_exif(ruta, exif):
-    img = Image.open(ruta)
-    img.save(ruta, "jpeg", exif=piexif.dump(exif))
+    with open(ruta, "rb") as f:
+        datos = insertar_exif(f.read(), exif)
+    # Se escribe en un temporal y se sustituye de una vez: si algo falla a medias
+    # (disco lleno, iCloud sincronizando), la foto original queda intacta.
+    carpeta = os.path.dirname(os.path.abspath(ruta))
+    descriptor, temporal = tempfile.mkstemp(dir=carpeta, suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "wb") as f:
+            f.write(datos)
+        os.replace(temporal, ruta)
+    except BaseException:
+        if os.path.exists(temporal):
+            os.remove(temporal)
+        raise
 
 
 def leer_metadatos(ruta):
