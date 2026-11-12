@@ -3,9 +3,12 @@ import os
 import requests
 import wx
 
-from ia import compatible_openai
-from interfaz.dialogos import (CONFIG_APP, DialogoAcercaDe, DialogoAyuda, DialogoClave,
-                               DialogoEditar)
+from ia import claves, servicio
+from ia.errores import ErrorIA
+from interfaz import configuracion
+from interfaz.dialogo_ia import DialogoIA
+from interfaz.dialogos import DialogoAcercaDe, DialogoAyuda, DialogoEditar
+from interfaz.progreso import Cancelado, ejecutar_con_progreso
 from logica import metadatos
 
 EXTENSIONES = (".jpg", ".jpeg", ".png", ".bmp", ".gif", ".heif", ".heic")
@@ -28,10 +31,11 @@ class VentanaPrincipal(wx.Frame):
         self.id_address = wx.NewIdRef()
         self.id_auto_desc = wx.NewIdRef()
         self.id_back = wx.NewIdRef()
+        self.id_help = wx.NewIdRef()
+        self.id_ia = wx.NewIdRef()
         super().__init__(parent, title="FotoDesc", size=(1000, 700))
         self.imagenes = []     # Rutas, en el mismo orden que las filas de la lista
         self.direcciones = {}  # Ruta -> dirección obtenida o escrita a mano
-        self.clave = ""
         self.InitUI()
         self.SetAcceleratorTable(wx.AcceleratorTable([
             (wx.ACCEL_ALT, ord("I"), self.id_add_image),
@@ -42,6 +46,10 @@ class VentanaPrincipal(wx.Frame):
             (wx.ACCEL_ALT, ord("E"), self.id_edit),
             (wx.ACCEL_ALT, ord("D"), self.id_address),
             (wx.ACCEL_ALT, ord("O"), self.id_auto_desc),
+            # En la 1.0, F1 y Ctrl+K solo aparecían en el menú de Configuración y no
+            # funcionaban desde la ventana.
+            (wx.ACCEL_NORMAL, wx.WXK_F1, self.id_help),
+            (wx.ACCEL_CTRL, ord("K"), self.id_ia),
         ]))
         self.Bind(wx.EVT_MENU, self.on_add_image, id=self.id_add_image)
         self.Bind(wx.EVT_MENU, self.on_add_folder, id=self.id_add_folder)
@@ -51,6 +59,8 @@ class VentanaPrincipal(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_edit, id=self.id_edit)
         self.Bind(wx.EVT_MENU, self.on_address, id=self.id_address)
         self.Bind(wx.EVT_MENU, self.on_auto_desc, id=self.id_auto_desc)
+        self.Bind(wx.EVT_MENU, self.mostrar_ayuda, id=self.id_help)
+        self.Bind(wx.EVT_MENU, self.mostrar_dialogo_ia, id=self.id_ia)
 
     def InitUI(self):
         self.main_panel = wx.Panel(self)
@@ -190,10 +200,10 @@ class VentanaPrincipal(wx.Frame):
         id_api = wx.NewIdRef()
         id_about = wx.NewIdRef()
         menu.Append(id_help, "Ayuda\tF1")
-        menu.Append(id_api, "Configurar API Key\tCtrl+K")
+        menu.Append(id_api, "Inteligencia artificial…\tCtrl+K")
         menu.Append(id_about, "Acerca de\tAlt+U")
         self.Bind(wx.EVT_MENU, self.mostrar_ayuda, id=id_help)
-        self.Bind(wx.EVT_MENU, self.mostrar_dialogo_clave, id=id_api)
+        self.Bind(wx.EVT_MENU, self.mostrar_dialogo_ia, id=id_api)
         self.Bind(wx.EVT_MENU, self.on_about, id=id_about)
         btn = event.GetEventObject()
         pos = self.ScreenToClient(btn.ClientToScreen((0, btn.GetSize().y)))
@@ -210,11 +220,9 @@ class VentanaPrincipal(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
 
-    def mostrar_dialogo_clave(self, event):
-        dlg = DialogoClave(self, self.clave)
-        if dlg.ShowModal() == wx.ID_OK:
-            self.clave = dlg.get_clave()
-            wx.Config(CONFIG_APP).Write("OpenAI_API_Key", self.clave)
+    def mostrar_dialogo_ia(self, event):
+        dlg = DialogoIA(self)
+        dlg.ShowModal()
         dlg.Destroy()
 
     def anadir_imagen(self, ruta):
@@ -302,16 +310,34 @@ class VentanaPrincipal(wx.Frame):
             wx.MessageBox("Selecciona una imagen para obtener descripción.", "Error", wx.OK | wx.ICON_ERROR)
             return
         ruta, fila = seleccion
+        nombre = os.path.basename(ruta)
+        # Se comprueba antes de llamar a la IA para no gastar una petición en vano.
+        with open(ruta, "rb") as f:
+            if not metadatos.es_jpeg(f.read(2)):
+                wx.MessageBox(str(metadatos.FormatoNoSoportado()), "Error", wx.OK | wx.ICON_ERROR)
+                return
+        ajustes = configuracion.leer_ajustes()
+        clave = claves.leer(ajustes.id_proveedor)
         try:
-            descripcion = compatible_openai.describir_imagen(self.clave, ruta)
+            descripcion = ejecutar_con_progreso(
+                self, f"Describiendo {nombre}", lambda: servicio.describir_foto(ajustes, clave, ruta))
+        except Cancelado:
+            self.enfocar_fila(fila)
+            return
+        except ErrorIA as e:
+            wx.MessageBox(servicio.texto_error(e, ajustes), "Error", wx.OK | wx.ICON_ERROR)
+            self.enfocar_fila(fila)
+            return
+        try:
             exif = metadatos.leer_exif(ruta)
             metadatos.poner_descripcion(exif, descripcion)
             metadatos.guardar_exif(ruta, exif)
-            self.refrescar_lista()
-            wx.MessageBox("Descripción automática obtenida correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
-            self.enfocar_fila(fila)
         except Exception as e:
-            wx.MessageBox("Error al obtener la descripción automática: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            wx.MessageBox("No se pudo guardar la descripción: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            return
+        self.refrescar_lista()
+        wx.MessageBox(f"Descripción guardada, {nombre}", "Confirmación", wx.OK | wx.ICON_INFORMATION)
+        self.enfocar_fila(fila)
 
     def on_address(self, event):
         seleccion = self.imagen_seleccionada()

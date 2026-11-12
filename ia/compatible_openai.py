@@ -1,27 +1,19 @@
-"""Petición de descripción a un servicio con la API de chat de OpenAI."""
+"""Servicios con la API de chat de OpenAI: OpenAI, Gemini, Groq, OpenRouter, Ollama..."""
 import base64
-import json
-import mimetypes
-import urllib.error
-import urllib.request
 
-URL_OPENAI = "https://api.openai.com/v1/chat/completions"
-MODELO_POR_DEFECTO = "gpt-4o-mini"
-PROMPT_POR_DEFECTO = "Describe la imagen de manera detallada."
+import requests
+
+from ia import errores
+from ia.errores import ErrorIA
 
 
-class ErrorIA(Exception):
-    pass
+def data_url_jpeg(datos):
+    return "data:image/jpeg;base64," + base64.b64encode(datos).decode("ascii")
 
 
-def imagen_a_data_url(contenido, ruta):
-    """Codifica los bytes de la imagen como data URL; el tipo se deduce de la extensión."""
-    tipo = mimetypes.guess_type(ruta)[0] or "application/octet-stream"
-    codificado = base64.b64encode(contenido).decode("utf-8")
-    return f"data:{tipo};base64,{codificado}"
-
-
-def construir_peticion(modelo, prompt, data_url, detalle="high", max_tokens=300):
+def construir_peticion(modelo, prompt, datos_jpeg):
+    # Sin max_tokens: los modelos con razonamiento (gpt-5, gpt-6...) lo rechazan o
+    # gastan el límite pensando y devuelven texto vacío. La longitud la marca el prompt.
     return {
         "model": modelo,
         "messages": [
@@ -29,11 +21,10 @@ def construir_peticion(modelo, prompt, data_url, detalle="high", max_tokens=300)
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": data_url, "detail": detalle}},
+                    {"type": "image_url", "image_url": {"url": data_url_jpeg(datos_jpeg)}},
                 ],
             }
         ],
-        "max_tokens": max_tokens,
     }
 
 
@@ -43,26 +34,29 @@ def extraer_texto(respuesta):
         texto = respuesta["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
         texto = None
-    if not texto:
-        raise ErrorIA("No se encontró contenido en la respuesta.")
-    return texto
+    if not texto or not texto.strip():
+        raise ErrorIA(errores.OTRO, "la respuesta llegó vacía.")
+    return texto.strip()
 
 
-def describir_imagen(clave, ruta, prompt=PROMPT_POR_DEFECTO, modelo=MODELO_POR_DEFECTO,
-                     url=URL_OPENAI):
-    with open(ruta, "rb") as f:
-        data_url = imagen_a_data_url(f.read(), ruta)
-    datos = json.dumps(construir_peticion(modelo, prompt, data_url)).encode("utf-8")
-
-    peticion = urllib.request.Request(url, data=datos)
-    peticion.add_header("Content-Type", "application/json")
-    peticion.add_header("Authorization", "Bearer " + clave)
+def describir(url_base, clave, modelo, prompt, datos_jpeg, timeout=60, sesion=requests):
+    cabeceras = {"Content-Type": "application/json"}
+    if clave:
+        cabeceras["Authorization"] = "Bearer " + clave
     try:
-        with urllib.request.urlopen(peticion) as respuesta:
-            return extraer_texto(json.loads(respuesta.read().decode("utf-8")))
-    except urllib.error.HTTPError as e:
-        raise ErrorIA("Error en la petición: {} - {}".format(e.code, e.read().decode("utf-8")))
-    except ErrorIA:
-        raise
-    except Exception as e:
-        raise ErrorIA("Se produjo un error: " + str(e))
+        respuesta = sesion.post(url_base.rstrip("/") + "/chat/completions",
+                                json=construir_peticion(modelo, prompt, datos_jpeg),
+                                headers=cabeceras, timeout=timeout)
+    except requests.Timeout:
+        raise ErrorIA(errores.TIEMPO)
+    except requests.ConnectionError as e:
+        raise ErrorIA(errores.CONEXION, str(e))
+
+    if respuesta.status_code != 200:
+        cuerpo = respuesta.text
+        raise ErrorIA(errores.tipo_por_estado_http(respuesta.status_code, cuerpo),
+                      f"código {respuesta.status_code}. {cuerpo[:300]}")
+    try:
+        return extraer_texto(respuesta.json())
+    except ValueError:
+        raise ErrorIA(errores.OTRO, "la respuesta no se pudo leer.")

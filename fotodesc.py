@@ -1,19 +1,22 @@
 """Punto de entrada de FotoDesc."""
 import wx
 
-from interfaz.dialogos import CONFIG_APP, DialogoAyuda
+from ia import claves
+from interfaz.configuracion import config
+from interfaz.dialogos import DialogoAyuda
 from interfaz.ventana_principal import VentanaPrincipal
 
 
 def main():
     app = wx.App(False)
-    # Los nombres de las claves de configuración se mantienen para no perder
-    # la clave ni las preferencias de quien ya usaba la versión 1.0.
-    config = wx.Config(CONFIG_APP)
+    # "ShowHelpOnStartup" y "OpenAI_API_Key" son los nombres de la versión 1.0: se
+    # mantienen para no perder las preferencias de quien ya la usaba.
+    preferencias = config()
+    claves.migrar_clave_antigua(preferencias.Read("OpenAI_API_Key", ""),
+                                lambda: preferencias.DeleteEntry("OpenAI_API_Key"))
     ventana = VentanaPrincipal(None)
-    ventana.clave = config.Read("OpenAI_API_Key", "")
     ventana.Show()
-    if config.ReadBool("ShowHelpOnStartup", True):
+    if preferencias.ReadBool("ShowHelpOnStartup", True):
         dlg = DialogoAyuda(ventana)
         dlg.ShowModal()
         dlg.Destroy()

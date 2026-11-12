@@ -2,9 +2,8 @@ import os
 
 import wx
 
+from interfaz.configuracion import CONFIG_APP
 from logica import metadatos
-
-CONFIG_APP = "FotodescApp"
 
 
 class DialogoAcercaDe(wx.Dialog):
@@ -31,42 +30,6 @@ class DialogoAcercaDe(wx.Dialog):
 
     def on_ok(self, event):
         self.EndModal(wx.ID_OK)
-
-
-class DialogoClave(wx.Dialog):
-    """Diálogo para introducir la API Key de OpenAI."""
-
-    def __init__(self, parent, clave_actual):
-        super().__init__(parent, title="Configurar API Key", size=(400, 200))
-        panel = wx.Panel(self)
-        vbox = wx.BoxSizer(wx.VERTICAL)
-
-        label = wx.StaticText(panel, label="Ingrese su API Key de OpenAI:")
-        vbox.Add(label, 0, wx.ALL | wx.CENTER, 10)
-
-        self.txt_api_key = wx.TextCtrl(panel, value=clave_actual)
-        vbox.Add(self.txt_api_key, 0, wx.EXPAND | wx.ALL, 10)
-
-        hbox = wx.BoxSizer(wx.HORIZONTAL)
-        btn_guardar = wx.Button(panel, label="Guardar")
-        btn_cancelar = wx.Button(panel, label="Cancelar")
-        hbox.Add(btn_guardar, 0, wx.ALL, 5)
-        hbox.Add(btn_cancelar, 0, wx.ALL, 5)
-        vbox.Add(hbox, 0, wx.ALIGN_CENTER)
-        panel.SetSizer(vbox)
-
-        btn_guardar.Bind(wx.EVT_BUTTON, self.on_guardar)
-        btn_cancelar.Bind(wx.EVT_BUTTON, self.on_cancelar)
-
-    def on_guardar(self, event):
-        wx.MessageBox("API Key guardada correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
-        self.EndModal(wx.ID_OK)
-
-    def on_cancelar(self, event):
-        self.EndModal(wx.ID_CANCEL)
-
-    def get_clave(self):
-        return self.txt_api_key.GetValue()
 
 
 class DialogoAyuda(wx.Dialog):
