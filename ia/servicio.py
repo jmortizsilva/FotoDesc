@@ -12,6 +12,16 @@ PROMPT = ("Describe esta foto en español para una persona ciega: qué se ve, d�
 PROMPT_PRUEBA = "Responde solo con la palabra OK."
 
 
+def prompt_para(lugar=""):
+    """Instrucción para la IA; si se sabe dónde se hizo la foto, se le dice."""
+    if not lugar:
+        return PROMPT
+    # Se le da como dato y no como algo que deba repetir: si la foto es de un interior
+    # cualquiera, nombrar el sitio no aporta.
+    return (PROMPT + f" La foto se hizo en {lugar}; nómbralo solo si ayuda a entender "
+            "lo que se ve.")
+
+
 @dataclass
 class Ajustes:
     id_proveedor: str
@@ -42,12 +52,12 @@ def enviar(ajustes, clave, prompt, datos_jpeg):
                                        ajustes.modelo_efectivo(), prompt, datos_jpeg)
 
 
-def describir_foto(ajustes, clave, ruta):
+def describir_foto(ajustes, clave, ruta, lugar=""):
     try:
         datos = imagen.leer_y_preparar(ruta)
     except OSError as e:
         raise ErrorIA(errores.OTRO, f"no se pudo abrir la foto ({e}).")
-    return enviar(ajustes, clave, PROMPT, datos)
+    return enviar(ajustes, clave, prompt_para(lugar), datos)
 
 
 def probar(ajustes, clave):

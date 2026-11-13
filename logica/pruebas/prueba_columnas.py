@@ -38,3 +38,14 @@ def prueba_mover_avisa_en_los_extremos():
     assert columnas.mover(0, -1) == (0, True)
     ultima = len(columnas.COLUMNAS) - 1
     assert columnas.mover(ultima, 1) == (ultima, True)
+
+
+def prueba_ubicacion_prefiere_el_lugar_guardado():
+    from logica.lugares import Lugar
+    con_lugar = Metadatos(gps=(40.8, -2.1), lugar=Lugar(localidad="Peralejos de las Truchas",
+                                                          provincia="Guadalajara", codigo_pais="es"))
+    assert columnas.texto_ubicacion(con_lugar) == "Peralejos de las Truchas, Guadalajara"
+    solo_gps = Metadatos(gps=(40.8, -2.1))
+    assert columnas.texto_ubicacion(solo_gps, buscando=True) == "buscando"
+    assert columnas.texto_ubicacion(solo_gps) == "40,8000; -2,1000"
+    assert columnas.texto_ubicacion(Metadatos(), buscando=True) == ""

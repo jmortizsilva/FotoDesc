@@ -28,3 +28,10 @@ def prueba_falta_clave_se_detecta_antes_de_llamar():
 def prueba_texto_error_usa_nombre_corto_y_local():
     texto = servicio.texto_error(ErrorIA(errores.CONEXION), Ajustes("ollama", "", ""))
     assert texto == "No se puede conectar con Ollama. Comprueba que está abierto."
+
+
+def prueba_el_lugar_se_pasa_a_la_ia():
+    assert servicio.prompt_para("") == servicio.PROMPT
+    texto = servicio.prompt_para("Catedral de Burgos, Burgos")
+    assert texto.startswith(servicio.PROMPT)
+    assert "Catedral de Burgos, Burgos" in texto

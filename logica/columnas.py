@@ -1,4 +1,5 @@
 """Columnas de la lista de fotos: qué se muestra y qué se anuncia al recorrerlas."""
+from logica import lugares
 
 COLUMNAS = ["Nombre", "Descripción", "Fecha", "Hora", "Ubicación", "Dirección"]
 
@@ -27,12 +28,21 @@ def ubicacion_legible(gps):
     return "; ".join(f"{valor:.4f}".replace(".", ",") for valor in gps)
 
 
-def valores_fila(nombre, datos, direccion):
+def texto_ubicacion(datos, buscando=False):
+    """El lugar guardado en la foto; si no lo hay, 'buscando' o las coordenadas."""
+    if datos.lugar and not datos.lugar.vacio():
+        return lugares.texto(datos.lugar)
+    if datos.gps and buscando:
+        return "buscando"
+    return ubicacion_legible(datos.gps)
+
+
+def valores_fila(nombre, datos, direccion, buscando=False):
     """Textos de las columnas, en el orden de COLUMNAS. `datos` es un Metadatos."""
     # La lista solo muestra una línea por celda: los saltos de línea se leerían pegados.
     descripcion = " ".join(datos.descripcion.split())
     return [nombre, descripcion, fecha_legible(datos.fecha), datos.hora,
-            ubicacion_legible(datos.gps), direccion]
+            texto_ubicacion(datos, buscando), direccion]
 
 
 def anuncio(columna, valor):

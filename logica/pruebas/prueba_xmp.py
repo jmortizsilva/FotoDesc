@@ -56,3 +56,20 @@ def prueba_descripcion_vacia_la_quita():
     paquete = xmp.poner_descripcion(XMP_SOLO_DESCRIPCION, "  ")
     assert xmp.leer_descripcion(paquete) == ""
     assert "ArtworkContentDescription" not in paquete
+
+
+def prueba_lugar_ida_y_vuelta_sin_tocar_la_descripcion():
+    lugar = {"sitio": "Catedral de Burgos", "localidad": "Burgos", "provincia": "Burgos",
+             "pais": "España", "codigo_pais": "es"}
+    paquete = xmp.poner_lugar(XMP_SOLO_DESCRIPCION, lugar)
+    assert xmp.leer_lugar(paquete) == lugar
+    assert 'CountryCode="ES"' in paquete
+    assert xmp.leer_descripcion(paquete) == "Un cielo al atardecer sobre el mar."
+    # Sustituir no deja restos del lugar anterior
+    paquete = xmp.poner_lugar(paquete, {"localidad": "Soria"})
+    assert xmp.leer_lugar(paquete) == {"localidad": "Soria"}
+
+
+def prueba_sin_lugar():
+    assert xmp.leer_lugar(XMP_SOLO_DESCRIPCION) == {}
+    assert xmp.leer_lugar(None) == {}

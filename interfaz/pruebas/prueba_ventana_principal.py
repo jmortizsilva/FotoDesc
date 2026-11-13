@@ -101,3 +101,29 @@ def prueba_los_avisos_tienen_padre_y_devuelven_el_foco(ventana, monkeypatch):
     ventana.avisar("Descripción guardada, a.jpg", "Confirmación", wx.OK)
     assert llamadas[0][3] is ventana
     assert recuperaciones == [1]
+
+
+def prueba_ubicacion_buscando_y_despues_el_lugar(ventana, tmp_path):
+    from logica import metadatos
+    from logica.lugares import Lugar
+
+    class BuscadorFalso:
+        def __init__(self):
+            self.pendientes = set()
+
+        def anadir(self, rutas):
+            self.pendientes.update(rutas)
+
+    ruta = tmp_path / "con_gps.jpg"
+    Image.new("RGB", (8, 8)).save(ruta, "jpeg")
+    metadatos.guardar_cambios(str(ruta), metadatos.Cambios(gps=(40.8, -2.1)))
+    ventana.buscador = BuscadorFalso()
+    ventana.anadir_imagenes([str(ruta)])
+    assert ventana.list_ctrl.GetItemText(0, 4) == "buscando"
+
+    ventana.buscador.pendientes.clear()
+    ventana.al_encontrar_lugar(str(ruta), Lugar(localidad="Peralejos de las Truchas",
+                                                provincia="Guadalajara", codigo_pais="es"))
+    assert ventana.list_ctrl.GetItemText(0, 4) == "Peralejos de las Truchas, Guadalajara"
+    ventana.al_encontrar_lugar(str(ruta), None)
+    assert ventana.list_ctrl.GetItemText(0, 4) == "40,8000; -2,1000"

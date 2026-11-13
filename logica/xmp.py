@@ -115,3 +115,61 @@ def poner_descripcion(paquete, texto):
         alternativas = ET.SubElement(extendida, "{%s}Alt" % NS["rdf"])
         ET.SubElement(alternativas, "{%s}li" % NS["rdf"], {XML_LANG: "x-default"}).text = texto
     return ET.tostring(raiz, encoding="unicode")
+
+
+# ---------------- Lugar ----------------
+# Campos clásicos de "ubicación mostrada" del estándar IPTC, los que leen casi todos
+# los programas: photoshop:City/State/Country e Iptc4xmpCore:CountryCode/Location
+# (Location es la "sublocalización": el sitio o monumento).
+CAMPOS_LUGAR = {
+    "sitio": "{%s}Location" % NS["Iptc4xmpCore"],
+    "localidad": "{%s}City" % NS["photoshop"],
+    "provincia": "{%s}State" % NS["photoshop"],
+    "pais": "{%s}Country" % NS["photoshop"],
+    "codigo_pais": "{%s}CountryCode" % NS["Iptc4xmpCore"],
+}
+
+
+def leer_lugar(paquete):
+    """Diccionario con los campos de lugar que tenga el XMP (vacío si ninguno)."""
+    if not paquete:
+        return {}
+    try:
+        raiz = _raiz(paquete)
+    except ET.ParseError:
+        return {}
+    encontrado = {}
+    for descripcion in raiz.iter(DESCRIPTION):
+        for nombre, campo in CAMPOS_LUGAR.items():
+            valor = descripcion.get(campo)
+            if valor is None:
+                hijo = descripcion.find(campo)
+                valor = hijo.text if hijo is not None else None
+            if valor and nombre not in encontrado:
+                encontrado[nombre] = valor.strip()
+    if "codigo_pais" in encontrado:
+        encontrado["codigo_pais"] = encontrado["codigo_pais"].lower()
+    return encontrado
+
+
+def poner_lugar(paquete, lugar):
+    """Devuelve el paquete con los campos de lugar sustituidos por los de `lugar` (dict)."""
+    raiz = _raiz(paquete) if paquete else ET.fromstring(PAQUETE_VACIO)
+    rdf = raiz.find(RDF)
+    descripciones = list(rdf.iter(DESCRIPTION)) if rdf is not None else []
+    if not descripciones:
+        if rdf is None:
+            rdf = ET.SubElement(raiz, RDF)
+        descripciones = [ET.SubElement(rdf, DESCRIPTION, {"{%s}about" % NS["rdf"]: ""})]
+    for descripcion in descripciones:
+        for campo in CAMPOS_LUGAR.values():
+            descripcion.attrib.pop(campo, None)
+            for hijo in descripcion.findall(campo):
+                descripcion.remove(hijo)
+    for nombre, campo in CAMPOS_LUGAR.items():
+        valor = (lugar.get(nombre) or "").strip()
+        if nombre == "codigo_pais":
+            valor = valor.upper()  # El estándar lo pide en mayúsculas
+        if valor:
+            descripciones[0].set(campo, valor)
+    return ET.tostring(raiz, encoding="unicode")

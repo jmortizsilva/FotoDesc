@@ -10,7 +10,10 @@ from interfaz.dialogo_ia import DialogoIA
 from interfaz.dialogos import DialogoAcercaDe, DialogoAyuda, DialogoEditar
 from interfaz.progreso import Cancelado, ejecutar_con_progreso
 from interfaz import voz
-from logica import columnas, metadatos
+from interfaz.buscador_lugares import BuscadorLugares
+from logica import columnas, lugares, metadatos
+from ubicacion.cache import CacheLugares
+from ubicacion.nominatim import Nominatim
 
 EXTENSIONES = (".jpg", ".jpeg", ".png", ".bmp", ".gif", ".heif", ".heic")
 
@@ -38,6 +41,7 @@ class VentanaPrincipal(wx.Frame):
         self.imagenes = []     # Rutas, en el mismo orden que las filas de la lista
         self.direcciones = {}  # Ruta -> dirección obtenida o escrita a mano
         self.columna = 0       # Columna en la que está quien recorre la lista con izquierda/derecha
+        self.buscador = None   # Busca el lugar de las fotos con GPS; se crea al cargar fotos
         self.InitUI()
         self.SetAcceleratorTable(wx.AcceleratorTable([
             (wx.ACCEL_ALT, ord("I"), self.id_add_image),
@@ -187,6 +191,8 @@ class VentanaPrincipal(wx.Frame):
                 confirmar.Destroy()
                 if resultado == wx.ID_NO:
                     self.imagenes = []
+                    if self.buscador:
+                        self.buscador.vaciar()
             self.anadir_imagenes(os.path.join(carpeta, nombre) for nombre in sorted(os.listdir(carpeta))
                                  if nombre.lower().endswith(EXTENSIONES))
             self.mostrar_listado()
@@ -252,10 +258,37 @@ class VentanaPrincipal(wx.Frame):
     def anadir_imagenes(self, rutas):
         # La lista se monta una sola vez al final: montarla por cada foto leía los
         # metadatos de todas las anteriores otra vez (cuadrático con carpetas grandes).
+        nuevas = []
         for ruta in rutas:
             if ruta not in self.imagenes:
                 self.imagenes.append(ruta)
+                nuevas.append(ruta)
+        sin_lugar = []
+        for ruta in nuevas:
+            datos = metadatos.leer_metadatos(ruta)
+            if datos.gps and not datos.lugar:
+                sin_lugar.append(ruta)
+        if sin_lugar:
+            if self.buscador is None:
+                self.buscador = self.crear_buscador()
+            self.buscador.anadir(sin_lugar)
         self.refrescar_lista()
+
+    def crear_buscador(self):
+        ruta_cache = os.path.join(wx.StandardPaths.Get().GetUserDataDir(), "lugares.json")
+        return BuscadorLugares(CacheLugares(ruta_cache), Nominatim(), self.al_encontrar_lugar,
+                               wx.CallAfter)
+
+    def al_encontrar_lugar(self, ruta, lugar):
+        """Actualiza solo la celda de Ubicación, sin rehacer la lista ni mover el foco."""
+        if ruta not in self.imagenes:
+            return
+        fila = self.imagenes.index(ruta)
+        if lugar:
+            texto = lugares.texto(lugar)
+        else:
+            texto = columnas.ubicacion_legible(metadatos.leer_metadatos(ruta).gps)
+        self.list_ctrl.SetItem(fila, columnas.COLUMNAS.index("Ubicación"), texto)
 
     def cambiar_ruta(self, ruta_vieja, ruta_nueva):
         """Tras renombrar un archivo: actualiza la lista y la dirección guardada."""
@@ -268,8 +301,9 @@ class VentanaPrincipal(wx.Frame):
         seleccionada = self.list_ctrl.GetFirstSelected()
         self.list_ctrl.DeleteAllItems()
         for ruta in self.imagenes:
+            buscando = bool(self.buscador) and ruta in self.buscador.pendientes
             valores = columnas.valores_fila(os.path.basename(ruta), metadatos.leer_metadatos(ruta),
-                                            self.direcciones.get(ruta, ""))
+                                            self.direcciones.get(ruta, ""), buscando)
             fila = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), valores[0])
             for indice, valor in enumerate(valores[1:], start=1):
                 self.list_ctrl.SetItem(fila, indice, valor)
@@ -340,9 +374,12 @@ class VentanaPrincipal(wx.Frame):
                 return
         ajustes = configuracion.leer_ajustes()
         clave = claves.leer(ajustes.id_proveedor)
+        lugar = metadatos.leer_metadatos(ruta).lugar
+        texto_lugar = lugares.texto(lugar) if lugar else ""
         try:
             descripcion = ejecutar_con_progreso(
-                self, f"Describiendo {nombre}", lambda: servicio.describir_foto(ajustes, clave, ruta))
+                self, f"Describiendo {nombre}",
+                lambda: servicio.describir_foto(ajustes, clave, ruta, texto_lugar))
         except Cancelado:
             self.enfocar_fila(fila)
             return

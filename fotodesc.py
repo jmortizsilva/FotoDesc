@@ -9,6 +9,8 @@ from interfaz.ventana_principal import VentanaPrincipal
 
 def main():
     app = wx.App(False)
+    # Da nombre a la carpeta de datos (en Windows, %APPDATA%\FotoDesc).
+    app.SetAppName("FotoDesc")
     # "ShowHelpOnStartup" y "OpenAI_API_Key" son los nombres de la versión 1.0: se
     # mantienen para no perder las preferencias de quien ya la usaba.
     preferencias = config()

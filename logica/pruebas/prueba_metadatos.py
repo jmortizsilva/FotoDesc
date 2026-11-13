@@ -110,3 +110,15 @@ def prueba_archivo_que_no_es_imagen_devuelve_vacio(tmp_path):
     ruta = tmp_path / "nota.jpg"
     ruta.write_text("no soy una foto")
     assert metadatos.leer_metadatos(str(ruta)) == metadatos.Metadatos()
+
+
+def prueba_guardar_y_leer_el_lugar(tmp_path):
+    from logica.lugares import Lugar
+    ruta = foto(tmp_path, xmp_inicial=XMP_SOLO_DESCRIPCION)
+    antes = imagen_de(ruta)
+    lugar = Lugar("Faro de Cádiz", "Cádiz", "Cádiz", "España", "es")
+    metadatos.guardar_cambios(str(ruta), Cambios(lugar=lugar))
+    datos = metadatos.leer_metadatos(str(ruta))
+    assert datos.lugar == lugar
+    assert datos.descripcion == "Un cielo al atardecer sobre el mar."
+    assert imagen_de(ruta) == antes

@@ -19,6 +19,7 @@ import piexif
 from PIL import Image
 
 from logica import jpeg, xmp
+from logica.lugares import Lugar
 from logica.coordenadas import decimal_a_dms, dms_a_decimal, referencias
 from logica.jpeg import es_jpeg  # noqa: F401  (lo usa la interfaz)
 
@@ -37,6 +38,7 @@ class Metadatos:
     gps: Optional[Tuple[float, float]] = None
     fecha: str = ""  # DD/MM/AAAA
     hora: str = ""   # HH:MM:SS
+    lugar: Optional[Lugar] = None  # Lo guardado en la foto; None si no tiene
 
 
 @dataclass
@@ -46,6 +48,7 @@ class Cambios:
     fecha: Optional[str] = None
     hora: Optional[str] = None
     gps: Optional[Tuple[float, float]] = None
+    lugar: Optional[Lugar] = None
 
 
 class FormatoNoSoportado(Exception):
@@ -116,7 +119,9 @@ def extraer_metadatos(exif, paquete_xmp=None):
     if original:
         fecha, hora = fecha_exif_a_texto(original.decode("utf-8", errors="ignore"))
 
-    return Metadatos(descripcion, gps, fecha, hora)
+    campos_lugar = xmp.leer_lugar(paquete_xmp)
+    lugar = Lugar.desde_dict(campos_lugar) if campos_lugar else None
+    return Metadatos(descripcion, gps, fecha, hora, lugar)
 
 
 def _cambiar_exif(exif, cambios):
@@ -159,8 +164,12 @@ def aplicar_cambios(datos, cambios):
         piexif.insert(piexif.dump(exif), datos, flujo)
         datos = flujo.getvalue()
 
-    if cambios.descripcion is not None:
-        paquete = xmp.poner_descripcion(jpeg.leer_xmp(datos), cambios.descripcion)
+    if cambios.descripcion is not None or cambios.lugar is not None:
+        paquete = jpeg.leer_xmp(datos)
+        if cambios.descripcion is not None:
+            paquete = xmp.poner_descripcion(paquete, cambios.descripcion)
+        if cambios.lugar is not None:
+            paquete = xmp.poner_lugar(paquete, cambios.lugar.a_dict())
         datos = jpeg.poner_xmp(datos, paquete)
     return datos
 
