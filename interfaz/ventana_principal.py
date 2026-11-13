@@ -1,6 +1,5 @@
 import os
 
-import requests
 import wx
 
 from ia import claves, servicio
@@ -32,14 +31,12 @@ class VentanaPrincipal(wx.Frame):
         self.id_config = wx.NewIdRef()
         self.id_about = wx.NewIdRef()
         self.id_edit = wx.NewIdRef()
-        self.id_address = wx.NewIdRef()
         self.id_auto_desc = wx.NewIdRef()
         self.id_back = wx.NewIdRef()
         self.id_help = wx.NewIdRef()
         self.id_ia = wx.NewIdRef()
         super().__init__(parent, title="FotoDesc", size=(1000, 700))
         self.imagenes = []     # Rutas, en el mismo orden que las filas de la lista
-        self.direcciones = {}  # Ruta -> dirección obtenida o escrita a mano
         self.columna = 0       # Columna en la que está quien recorre la lista con izquierda/derecha
         self.buscador = None   # Busca el lugar de las fotos con GPS; se crea al cargar fotos
         self.InitUI()
@@ -50,7 +47,6 @@ class VentanaPrincipal(wx.Frame):
             (wx.ACCEL_ALT, ord("U"), self.id_about),
             (wx.ACCEL_ALT, ord("A"), self.id_back),
             (wx.ACCEL_ALT, ord("E"), self.id_edit),
-            (wx.ACCEL_ALT, ord("D"), self.id_address),
             (wx.ACCEL_ALT, ord("O"), self.id_auto_desc),
             # En la 1.0, F1 y Ctrl+K solo aparecían en el menú de Configuración y no
             # funcionaban desde la ventana.
@@ -63,7 +59,6 @@ class VentanaPrincipal(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_about, id=self.id_about)
         self.Bind(wx.EVT_MENU, self.on_back, id=self.id_back)
         self.Bind(wx.EVT_MENU, self.on_edit, id=self.id_edit)
-        self.Bind(wx.EVT_MENU, self.on_address, id=self.id_address)
         self.Bind(wx.EVT_MENU, self.on_auto_desc, id=self.id_auto_desc)
         self.Bind(wx.EVT_MENU, self.mostrar_ayuda, id=self.id_help)
         self.Bind(wx.EVT_MENU, self.mostrar_dialogo_ia, id=self.id_ia)
@@ -111,7 +106,7 @@ class VentanaPrincipal(wx.Frame):
         list_sizer = wx.BoxSizer(wx.VERTICAL)
         self.list_ctrl = wx.ListCtrl(panel_list, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
         self.list_ctrl.SetToolTip("Listado de imágenes")
-        anchos = [180, 320, 150, 80, 150, 250]
+        anchos = [180, 360, 150, 80, 280]
         for indice, (titulo, ancho) in enumerate(zip(columnas.COLUMNAS, anchos)):
             self.list_ctrl.InsertColumn(indice, titulo, width=ancho)
         list_sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 5)
@@ -122,13 +117,10 @@ class VentanaPrincipal(wx.Frame):
         self.btn_edit.SetToolTip("Atajo: Alt+E")
         self.btn_auto_desc = wx.Button(btn_panel, label="Obtener descripción")
         self.btn_auto_desc.SetToolTip("Atajo: Alt+O")
-        self.btn_address = wx.Button(btn_panel, label="Obtener dirección")
-        self.btn_address.SetToolTip("Atajo: Alt+D")
         self.btn_config = wx.Button(btn_panel, label="Configuración")
         self.btn_config.SetToolTip("Atajo: Alt+F")
         btn_sizer.Add(self.btn_edit, 0, wx.ALL, 5)
         btn_sizer.Add(self.btn_auto_desc, 0, wx.ALL, 5)
-        btn_sizer.Add(self.btn_address, 0, wx.ALL, 5)
         btn_sizer.Add(self.btn_config, 0, wx.ALL, 5)
         btn_panel.SetSizer(btn_sizer)
         list_sizer.Add(btn_panel, 0, wx.ALIGN_CENTER)
@@ -161,7 +153,6 @@ class VentanaPrincipal(wx.Frame):
         self.list_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_list_key_down)
         self.btn_edit.Bind(wx.EVT_BUTTON, self.on_edit)
         self.btn_auto_desc.Bind(wx.EVT_BUTTON, self.on_auto_desc)
-        self.btn_address.Bind(wx.EVT_BUTTON, self.on_address)
         self.btn_config.Bind(wx.EVT_BUTTON, self.on_config)
 
     def on_add_image(self, event):
@@ -291,11 +282,9 @@ class VentanaPrincipal(wx.Frame):
         self.list_ctrl.SetItem(fila, columnas.COLUMNAS.index("Ubicación"), texto)
 
     def cambiar_ruta(self, ruta_vieja, ruta_nueva):
-        """Tras renombrar un archivo: actualiza la lista y la dirección guardada."""
+        """Tras renombrar un archivo, actualiza su ruta en la lista."""
         if ruta_vieja in self.imagenes:
             self.imagenes[self.imagenes.index(ruta_vieja)] = ruta_nueva
-        if ruta_vieja in self.direcciones:
-            self.direcciones[ruta_nueva] = self.direcciones.pop(ruta_vieja)
 
     def refrescar_lista(self):
         seleccionada = self.list_ctrl.GetFirstSelected()
@@ -303,7 +292,7 @@ class VentanaPrincipal(wx.Frame):
         for ruta in self.imagenes:
             buscando = bool(self.buscador) and ruta in self.buscador.pendientes
             valores = columnas.valores_fila(os.path.basename(ruta), metadatos.leer_metadatos(ruta),
-                                            self.direcciones.get(ruta, ""), buscando)
+                                            buscando)
             fila = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), valores[0])
             for indice, valor in enumerate(valores[1:], start=1):
                 self.list_ctrl.SetItem(fila, indice, valor)
@@ -396,37 +385,6 @@ class VentanaPrincipal(wx.Frame):
         self.avisar(f"Descripción guardada, {nombre}", "Confirmación", wx.OK | wx.ICON_INFORMATION)
         self.enfocar_fila(fila)
 
-    def on_address(self, event):
-        seleccion = self.imagen_seleccionada()
-        if not seleccion:
-            self.avisar("Selecciona una imagen para obtener la dirección.", "Error", wx.OK | wx.ICON_ERROR)
-            return
-        ruta, fila = seleccion
-        datos = metadatos.leer_metadatos(ruta)
-        if not datos.gps:
-            self.avisar("No hay datos de latitud y longitud.", "Error", wx.OK | wx.ICON_ERROR)
-            return
-        latitud, longitud = datos.gps
-        parametros = {"format": "json", "lat": latitud, "lon": longitud, "zoom": 18, "addressdetails": 1}
-        cabeceras = {"User-Agent": "FotoDesc (https://github.com/jmortizsilva/FotoDesc)"}
-        try:
-            respuesta = requests.get("https://nominatim.openstreetmap.org/reverse",
-                                     params=parametros, headers=cabeceras, timeout=10)
-            if respuesta.status_code != 200:
-                self.avisar("Error al obtener la dirección. Código: " + str(respuesta.status_code),
-                              "Error", wx.OK | wx.ICON_ERROR)
-                return
-            direccion = respuesta.json().get("display_name", "")
-            if direccion:
-                self.direcciones[ruta] = direccion
-                self.refrescar_lista()
-                self.avisar("Dirección obtenida correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
-                self.enfocar_fila(fila)
-            else:
-                self.avisar("No se encontró dirección.", "Información", wx.OK | wx.ICON_INFORMATION)
-        except Exception as e:
-            self.avisar("Error en la conexión: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
-
     def enfocar_fila(self, fila):
         estado = wx.LIST_STATE_SELECTED | wx.LIST_STATE_FOCUSED
         self.list_ctrl.SetItemState(fila, estado, estado)
@@ -472,13 +430,10 @@ class VentanaPrincipal(wx.Frame):
             return
         menu = wx.Menu()
         id_edit = wx.NewIdRef()
-        id_address = wx.NewIdRef()
         id_desc = wx.NewIdRef()
         menu.Append(id_edit, "Editar\tAlt+E")
-        menu.Append(id_address, "Obtener Dirección\tAlt+D")
         menu.Append(id_desc, "Obtener Descripción\tAlt+O")
         self.Bind(wx.EVT_MENU, self.on_edit, id=id_edit)
-        self.Bind(wx.EVT_MENU, self.on_address, id=id_address)
         self.Bind(wx.EVT_MENU, self.on_auto_desc, id=id_desc)
         rect = self.list_ctrl.GetItemRect(seleccion[1], wx.LIST_RECT_BOUNDS)
         self.list_ctrl.PopupMenu(menu, (rect.x, rect.y))

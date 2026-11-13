@@ -1,7 +1,7 @@
 """Columnas de la lista de fotos: qué se muestra y qué se anuncia al recorrerlas."""
 from logica import lugares
 
-COLUMNAS = ["Nombre", "Descripción", "Fecha", "Hora", "Ubicación", "Dirección"]
+COLUMNAS = ["Nombre", "Descripción", "Fecha", "Hora", "Ubicación"]
 
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
@@ -37,12 +37,12 @@ def texto_ubicacion(datos, buscando=False):
     return ubicacion_legible(datos.gps)
 
 
-def valores_fila(nombre, datos, direccion, buscando=False):
+def valores_fila(nombre, datos, buscando=False):
     """Textos de las columnas, en el orden de COLUMNAS. `datos` es un Metadatos."""
     # La lista solo muestra una línea por celda: los saltos de línea se leerían pegados.
     descripcion = " ".join(datos.descripcion.split())
     return [nombre, descripcion, fecha_legible(datos.fecha), datos.hora,
-            texto_ubicacion(datos, buscando), direccion]
+            texto_ubicacion(datos, buscando)]
 
 
 def anuncio(columna, valor):

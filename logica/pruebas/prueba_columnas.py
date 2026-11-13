@@ -22,9 +22,9 @@ def prueba_ubicacion_con_coma_decimal_y_cuatro_cifras():
 
 def prueba_valores_fila_en_el_orden_de_las_columnas():
     datos = Metadatos("Río con\nniebla", (40.8, -2.1), "16/04/2022", "10:05:30")
-    assert columnas.valores_fila("IMG_1.jpg", datos, "Peralejos") == [
-        "IMG_1.jpg", "Río con niebla", "16 de abril de 2022", "10:05:30", "40,8000; -2,1000", "Peralejos"]
-    assert len(columnas.valores_fila("a", Metadatos(), "")) == len(columnas.COLUMNAS)
+    assert columnas.valores_fila("IMG_1.jpg", datos) == [
+        "IMG_1.jpg", "Río con niebla", "16 de abril de 2022", "10:05:30", "40,8000; -2,1000"]
+    assert len(columnas.valores_fila("a", Metadatos())) == len(columnas.COLUMNAS)
 
 
 def prueba_anuncio_nombre_y_valor_o_sin_datos():

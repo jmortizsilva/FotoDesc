@@ -47,11 +47,10 @@ class DialogoAyuda(wx.Dialog):
             "Pantalla de listado:\n"
             "  • Atrás (Alt+A): Vuelve a la pantalla de inicio.\n"
             "  • Editar (Alt+E): Abre la ventana para editar la imagen seleccionada.\n"
-            "  • Obtener dirección (Alt+D): Obtiene la dirección basada en la geolocalización.\n"
             "  • Obtener descripción (Alt+O): Obtiene la descripción automática mediante la API.\n"
             "  • Al pulsar Enter sobre una imagen se despliega un menú contextual con estas opciones.\n"
             "  • Flechas izquierda y derecha: leen la foto columna a columna.\n"
-            "  • Ctrl+1 a Ctrl+6: leen directamente una columna.\n\n"
+            "  • Ctrl+1 a Ctrl+5: leen directamente una columna.\n\n"
             "Cuando se añade una carpeta y ya hay imágenes cargadas, se le preguntará:\n"
             "  ¿Desea añadir las nuevas imágenes a la lista actual o reemplazarla?\n"
             "\nGracias por usar FotoDesc."
@@ -89,7 +88,6 @@ class DialogoEditar(wx.Dialog):
 
         datos = metadatos.leer_metadatos(ruta)
         self.datos = datos
-        direccion = parent.direcciones.get(ruta, "")
         latitud = str(datos.gps[0]) if datos.gps else ""
         longitud = str(datos.gps[1]) if datos.gps else ""
         self.coordenadas_iniciales = (latitud, longitud)
@@ -100,7 +98,6 @@ class DialogoEditar(wx.Dialog):
         self.txt_desc = self.crear_campo(panel, sizer, "Descripción:", datos.descripcion, style=wx.TE_MULTILINE)
         self.txt_lat = self.crear_campo(panel, sizer, "Latitud:", latitud)
         self.txt_lon = self.crear_campo(panel, sizer, "Longitud:", longitud)
-        self.txt_dir = self.crear_campo(panel, sizer, "Dirección:", direccion)
 
         btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
         btn_guardar = wx.Button(panel, label="Guardar")
@@ -152,7 +149,6 @@ class DialogoEditar(wx.Dialog):
                     cambios.gps = (latitud, longitud)
             metadatos.guardar_cambios(self.ruta, cambios)
 
-            self.parent.direcciones[self.ruta] = self.txt_dir.GetValue().strip()
             wx.MessageBox("Datos de la foto editados correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION, self)
             self.EndModal(wx.ID_OK)
         except Exception as e:
