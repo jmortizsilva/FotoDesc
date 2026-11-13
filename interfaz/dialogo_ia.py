@@ -80,8 +80,9 @@ class DialogoIA(wx.Dialog):
         activo = configuracion.leer_ajustes().proveedor
         self.servicio.SetSelection(proveedores.PROVEEDORES.index(activo))
         self.cargar(activo.id)
+        # Sin SetFocus aquí: el diálogo aún no está a la vista y en Windows falla.
+        # Al abrirse, el foco va solo al primer control, Servicio.
         self.Centre()
-        self.servicio.SetFocus()
 
     # ---------- Estado de los campos ----------
 

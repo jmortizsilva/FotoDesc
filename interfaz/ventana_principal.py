@@ -167,7 +167,7 @@ class VentanaPrincipal(wx.Frame):
                             wildcard=f"Archivos de imagen ({comodin})|{comodin}",
                             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         if dlg.ShowModal() == wx.ID_OK:
-            self.anadir_imagen(dlg.GetPath())
+            self.anadir_imagenes([dlg.GetPath()])
             self.mostrar_listado()
         dlg.Destroy()
 
@@ -188,9 +188,8 @@ class VentanaPrincipal(wx.Frame):
                 confirmar.Destroy()
                 if resultado == wx.ID_NO:
                     self.imagenes = []
-            for nombre in sorted(os.listdir(carpeta)):
-                if nombre.lower().endswith(EXTENSIONES):
-                    self.anadir_imagen(os.path.join(carpeta, nombre))
+            self.anadir_imagenes(os.path.join(carpeta, nombre) for nombre in sorted(os.listdir(carpeta))
+                                 if nombre.lower().endswith(EXTENSIONES))
             self.mostrar_listado()
         dlg.Destroy()
 
@@ -225,9 +224,12 @@ class VentanaPrincipal(wx.Frame):
         dlg.ShowModal()
         dlg.Destroy()
 
-    def anadir_imagen(self, ruta):
-        if ruta not in self.imagenes:
-            self.imagenes.append(ruta)
+    def anadir_imagenes(self, rutas):
+        # La lista se monta una sola vez al final: montarla por cada foto leía los
+        # metadatos de todas las anteriores otra vez (cuadrático con carpetas grandes).
+        for ruta in rutas:
+            if ruta not in self.imagenes:
+                self.imagenes.append(ruta)
         self.refrescar_lista()
 
     def cambiar_ruta(self, ruta_vieja, ruta_nueva):
@@ -374,7 +376,10 @@ class VentanaPrincipal(wx.Frame):
         estado = wx.LIST_STATE_SELECTED | wx.LIST_STATE_FOCUSED
         self.list_ctrl.SetItemState(fila, estado, estado)
         self.list_ctrl.EnsureVisible(fila)
-        self.list_ctrl.SetFocus()
+        # Con la pantalla de inicio delante la lista está oculta: pedirle el foco
+        # falla en Windows ("'SetFocus' failed ... El parámetro no es correcto").
+        if self.list_ctrl.IsShownOnScreen():
+            self.list_ctrl.SetFocus()
 
     def on_list_item_activated(self, event):
         self.mostrar_menu_contextual()
