@@ -1,7 +1,13 @@
-"""Lectura y modificación de los metadatos EXIF de una foto.
+"""Lectura y modificación de los metadatos de una foto.
 
-Las funciones que trabajan sobre el diccionario EXIF son puras; solo `leer_exif`,
-`guardar_exif` y `leer_metadatos` tocan el disco.
+- La descripción accesible va en XMP (ver logica/xmp.py).
+- Fecha y GPS van en EXIF.
+- EXIF ImageDescription es donde escribía la versión 1.0: se lee para no perder esas
+  descripciones, pero no se escribe, porque Fotos de Apple lo convierte también en
+  pie de foto. Al guardar una descripción nueva se quita.
+
+`aplicar_cambios` trabaja sobre bytes y no toca el disco; `guardar_cambios` y
+`leer_metadatos` son la parte que lee y escribe archivos.
 """
 import io
 import os
@@ -12,7 +18,9 @@ from typing import Optional, Tuple
 import piexif
 from PIL import Image
 
+from logica import jpeg, xmp
 from logica.coordenadas import decimal_a_dms, dms_a_decimal, referencias
+from logica.jpeg import es_jpeg  # noqa: F401  (lo usa la interfaz)
 
 # Registrar el lector de HEIF/HEIC si pillow-heif está instalado.
 try:
@@ -29,6 +37,15 @@ class Metadatos:
     gps: Optional[Tuple[float, float]] = None
     fecha: str = ""  # DD/MM/AAAA
     hora: str = ""   # HH:MM:SS
+
+
+@dataclass
+class Cambios:
+    """Lo que se quiere cambiar; None en un campo significa no tocarlo."""
+    descripcion: Optional[str] = None
+    fecha: Optional[str] = None
+    hora: Optional[str] = None
+    gps: Optional[Tuple[float, float]] = None
 
 
 class FormatoNoSoportado(Exception):
@@ -67,10 +84,20 @@ def texto_a_fecha_exif(fecha, hora):
     return f"{anio}:{mes}:{dia} {hora}"
 
 
-def extraer_metadatos(exif):
-    """Saca descripción, GPS, fecha y hora de un diccionario EXIF de piexif."""
-    descripcion = exif.get("0th", {}).get(piexif.ImageIFD.ImageDescription, b"")
-    descripcion = descripcion.decode("utf-8", errors="ignore")
+def leer_coordenada(texto):
+    """Convierte '40,4168' o '40.4168' a float; None si no es un número."""
+    try:
+        return float(texto.strip().replace(",", "."))
+    except ValueError:
+        return None
+
+
+def extraer_metadatos(exif, paquete_xmp=None):
+    """Saca descripción, GPS, fecha y hora del EXIF (dict de piexif) y del XMP."""
+    descripcion = xmp.leer_descripcion(paquete_xmp)
+    if not descripcion:
+        antigua = exif.get("0th", {}).get(piexif.ImageIFD.ImageDescription, b"")
+        descripcion = antigua.decode("utf-8", errors="ignore").strip()
 
     gps = None
     datos_gps = exif.get("GPS", {})
@@ -92,62 +119,55 @@ def extraer_metadatos(exif):
     return Metadatos(descripcion, gps, fecha, hora)
 
 
-def poner_descripcion(exif, descripcion):
-    exif["0th"][piexif.ImageIFD.ImageDescription] = descripcion.encode("utf-8")
-
-
-def poner_fecha(exif, fecha, hora):
-    """Escribe la fecha original si las dos partes son válidas; si no, no toca nada."""
-    valor = texto_a_fecha_exif(fecha, hora)
+def _cambiar_exif(exif, cambios):
+    """Aplica fecha, GPS y la retirada del campo antiguo. Devuelve si cambió algo."""
+    cambiado = False
+    if cambios.descripcion is not None and piexif.ImageIFD.ImageDescription in exif["0th"]:
+        del exif["0th"][piexif.ImageIFD.ImageDescription]
+        cambiado = True
+    valor = texto_a_fecha_exif(cambios.fecha or "", cambios.hora or "")
     if valor:
         exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = valor.encode("utf-8")
+        cambiado = True
+    if cambios.gps:
+        latitud, longitud = cambios.gps
+        ref_lat, ref_lon = referencias(latitud, longitud)
+        exif["GPS"][piexif.GPSIFD.GPSLatitudeRef] = ref_lat.encode("utf-8")
+        exif["GPS"][piexif.GPSIFD.GPSLatitude] = decimal_a_dms(latitud)
+        exif["GPS"][piexif.GPSIFD.GPSLongitudeRef] = ref_lon.encode("utf-8")
+        exif["GPS"][piexif.GPSIFD.GPSLongitude] = decimal_a_dms(longitud)
+        cambiado = True
+    return cambiado
 
 
-def leer_coordenada(texto):
-    """Convierte '40,4168' o '40.4168' a float; None si no es un número."""
-    try:
-        return float(texto.strip().replace(",", "."))
-    except ValueError:
-        return None
-
-
-def poner_gps(exif, latitud, longitud):
-    ref_lat, ref_lon = referencias(latitud, longitud)
-    exif["GPS"][piexif.GPSIFD.GPSLatitudeRef] = ref_lat.encode("utf-8")
-    exif["GPS"][piexif.GPSIFD.GPSLatitude] = decimal_a_dms(latitud)
-    exif["GPS"][piexif.GPSIFD.GPSLongitudeRef] = ref_lon.encode("utf-8")
-    exif["GPS"][piexif.GPSIFD.GPSLongitude] = decimal_a_dms(longitud)
-
-
-# ---------------- Acceso al disco ----------------
-
-def leer_exif(ruta):
-    img = Image.open(ruta)
-    if "exif" in img.info:
-        return piexif.load(img.info["exif"])
-    return exif_vacio()
-
-
-def es_jpeg(datos):
-    return datos[:2] == b"\xff\xd8"
-
-
-def insertar_exif(datos, exif):
-    """Devuelve los bytes del JPEG con el EXIF sustituido, sin tocar la imagen.
+def aplicar_cambios(datos, cambios):
+    """Devuelve los bytes del JPEG con los cambios, sin tocar la imagen.
 
     La versión 1.0 guardaba con Image.save(), que recomprimía la foto con calidad 75
     y quitaba el perfil de color en cada guardado.
     """
-    if not es_jpeg(datos):
+    if not jpeg.es_jpeg(datos):
         raise FormatoNoSoportado()
-    salida = io.BytesIO()
-    piexif.insert(piexif.dump(exif), datos, salida)
-    return salida.getvalue()
+
+    exif = piexif.load(datos)
+    for grupo, valor in exif_vacio().items():
+        exif.setdefault(grupo, valor)
+    if _cambiar_exif(exif, cambios):
+        # El EXIF solo se reescribe si cambia: piexif.dump falla con algunos EXIF
+        # raros de cámara, y así una descripción se puede guardar igualmente.
+        flujo = io.BytesIO()
+        piexif.insert(piexif.dump(exif), datos, flujo)
+        datos = flujo.getvalue()
+
+    if cambios.descripcion is not None:
+        paquete = xmp.poner_descripcion(jpeg.leer_xmp(datos), cambios.descripcion)
+        datos = jpeg.poner_xmp(datos, paquete)
+    return datos
 
 
-def guardar_exif(ruta, exif):
-    with open(ruta, "rb") as f:
-        datos = insertar_exif(f.read(), exif)
+# ---------------- Acceso al disco ----------------
+
+def escribir_de_una_vez(ruta, datos):
     # Se escribe en un temporal y se sustituye de una vez: si algo falla a medias
     # (disco lleno, iCloud sincronizando), la foto original queda intacta.
     carpeta = os.path.dirname(os.path.abspath(ruta))
@@ -162,9 +182,18 @@ def guardar_exif(ruta, exif):
         raise
 
 
+def guardar_cambios(ruta, cambios):
+    with open(ruta, "rb") as f:
+        datos = aplicar_cambios(f.read(), cambios)
+    escribir_de_una_vez(ruta, datos)
+
+
 def leer_metadatos(ruta):
     """Metadatos de la foto; si no se puede leer, devuelve uno vacío."""
     try:
-        return extraer_metadatos(leer_exif(ruta))
+        with Image.open(ruta) as img:
+            exif = piexif.load(img.info["exif"]) if "exif" in img.info else exif_vacio()
+            paquete = img.info.get("xmp")
+        return extraer_metadatos(exif, paquete)
     except Exception:
         return Metadatos()

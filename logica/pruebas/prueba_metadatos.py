@@ -2,7 +2,9 @@ import piexif
 import pytest
 from PIL import Image
 
-from logica import metadatos
+from logica import jpeg, metadatos, xmp
+from logica.metadatos import Cambios
+from logica.pruebas.datos_apple import XMP_SOLO_DESCRIPCION
 
 
 def prueba_fecha_exif_a_texto():
@@ -29,57 +31,69 @@ def prueba_extraer_de_exif_vacio():
     assert metadatos.extraer_metadatos(metadatos.exif_vacio()) == metadatos.Metadatos()
 
 
-def prueba_escribir_y_leer_en_el_diccionario():
+def prueba_la_descripcion_de_apple_manda_sobre_la_antigua():
     exif = metadatos.exif_vacio()
-    metadatos.poner_descripcion(exif, "Barranco del río Tajo, con niebla")
-    metadatos.poner_fecha(exif, "16/04/2022", "10:05:30")
-    metadatos.poner_gps(exif, 40.8, -2.1)
-    datos = metadatos.extraer_metadatos(exif)
-    assert datos.descripcion == "Barranco del río Tajo, con niebla"
+    exif["0th"][piexif.ImageIFD.ImageDescription] = "Escrita con la 1.0".encode()
+    assert metadatos.extraer_metadatos(exif).descripcion == "Escrita con la 1.0"
+    assert metadatos.extraer_metadatos(exif, XMP_SOLO_DESCRIPCION).descripcion == \
+        "Un cielo al atardecer sobre el mar."
+
+
+# ---------- Con archivos reales ----------
+
+def foto(tmp_path, nombre="foto.jpg", descripcion_antigua=None, xmp_inicial=None):
+    ruta = tmp_path / nombre
+    exif = metadatos.exif_vacio()
+    if descripcion_antigua:
+        exif["0th"][piexif.ImageIFD.ImageDescription] = descripcion_antigua.encode()
+    Image.new("RGB", (64, 64), "red").save(ruta, "jpeg", quality=95, exif=piexif.dump(exif))
+    if xmp_inicial:
+        ruta.write_bytes(jpeg.poner_xmp(ruta.read_bytes(), xmp_inicial))
+    return ruta
+
+
+def imagen_de(ruta):
+    contenido = ruta.read_bytes()
+    return contenido[contenido.index(b"\xff\xda"):]
+
+
+def prueba_guardar_descripcion_va_a_xmp_y_quita_la_antigua(tmp_path):
+    ruta = foto(tmp_path, descripcion_antigua="Escrita con la 1.0")
+    assert metadatos.leer_metadatos(str(ruta)).descripcion == "Escrita con la 1.0"
+
+    metadatos.guardar_cambios(str(ruta), Cambios(descripcion="Una prueba con eñe"))
+    assert metadatos.leer_metadatos(str(ruta)).descripcion == "Una prueba con eñe"
+    datos = ruta.read_bytes()
+    # Fotos de Apple convierte EXIF ImageDescription también en pie de foto
+    assert piexif.ImageIFD.ImageDescription not in piexif.load(datos)["0th"]
+    assert xmp.leer_descripcion(jpeg.leer_xmp(datos)) == "Una prueba con eñe"
+
+
+def prueba_sobre_una_foto_de_apple_conserva_su_xmp(tmp_path):
+    ruta = foto(tmp_path, xmp_inicial=XMP_SOLO_DESCRIPCION)
+    metadatos.guardar_cambios(str(ruta), Cambios(descripcion="Nueva"))
+    paquete = jpeg.leer_xmp(ruta.read_bytes()).decode()
+    assert "2026-11-11T10:56:28" in paquete
+    assert metadatos.leer_metadatos(str(ruta)).descripcion == "Nueva"
+
+
+def prueba_guardar_no_recomprime_la_imagen(tmp_path):
+    ruta = foto(tmp_path)
+    antes = imagen_de(ruta)
+    for texto in ("primera", "segunda", "tercera"):
+        metadatos.guardar_cambios(str(ruta), Cambios(descripcion=texto))
+    metadatos.guardar_cambios(str(ruta), Cambios(fecha="16/04/2022", hora="10:05:30", gps=(40.8, -2.1)))
+    assert imagen_de(ruta) == antes
+    datos = metadatos.leer_metadatos(str(ruta))
+    assert datos.descripcion == "tercera"
     assert (datos.fecha, datos.hora) == ("16/04/2022", "10:05:30")
     assert datos.gps == pytest.approx((40.8, -2.1), abs=1e-5)
 
 
-def prueba_fecha_incompleta_no_toca_la_existente():
-    exif = metadatos.exif_vacio()
-    metadatos.poner_fecha(exif, "16/04/2022", "10:05:30")
-    metadatos.poner_fecha(exif, "", "")
-    assert exif["Exif"][piexif.ExifIFD.DateTimeOriginal] == b"2022:04:16 10:05:30"
-
-
-def prueba_guardar_y_leer_un_jpeg_real(tmp_path):
-    ruta = tmp_path / "foto.jpg"
-    Image.new("RGB", (32, 32), "green").save(ruta, "jpeg")
-    assert metadatos.leer_metadatos(str(ruta)) == metadatos.Metadatos()
-
-    exif = metadatos.leer_exif(str(ruta))
-    metadatos.poner_descripcion(exif, "Una prueba con eñe")
-    metadatos.guardar_exif(str(ruta), exif)
-    assert metadatos.leer_metadatos(str(ruta)).descripcion == "Una prueba con eñe"
-
-
-def prueba_archivo_que_no_es_imagen_devuelve_vacio(tmp_path):
-    ruta = tmp_path / "nota.jpg"
-    ruta.write_text("no soy una foto")
-    assert metadatos.leer_metadatos(str(ruta)) == metadatos.Metadatos()
-
-
-def prueba_guardar_no_recomprime_la_imagen(tmp_path):
-    ruta = tmp_path / "foto.jpg"
-    Image.new("RGB", (64, 64), "red").save(ruta, "jpeg", quality=95)
-
-    def datos_de_imagen():
-        # Lo que va después del EXIF: si cambia, se ha recomprimido.
-        contenido = ruta.read_bytes()
-        return contenido[contenido.index(b"\xff\xdb"):]
-
-    antes = datos_de_imagen()
-    for texto in ("primera", "segunda", "tercera"):
-        exif = metadatos.leer_exif(str(ruta))
-        metadatos.poner_descripcion(exif, texto)
-        metadatos.guardar_exif(str(ruta), exif)
-    assert datos_de_imagen() == antes
-    assert metadatos.leer_metadatos(str(ruta)).descripcion == "tercera"
+def prueba_cambiar_solo_la_fecha_no_toca_la_descripcion(tmp_path):
+    ruta = foto(tmp_path, xmp_inicial=XMP_SOLO_DESCRIPCION)
+    metadatos.guardar_cambios(str(ruta), Cambios(fecha="01/01/2020", hora="12:00:00"))
+    assert metadatos.leer_metadatos(str(ruta)).descripcion == "Un cielo al atardecer sobre el mar."
 
 
 def prueba_png_se_rechaza_sin_tocar_el_archivo(tmp_path):
@@ -87,6 +101,12 @@ def prueba_png_se_rechaza_sin_tocar_el_archivo(tmp_path):
     Image.new("RGB", (8, 8), "white").save(ruta, "png")
     original = ruta.read_bytes()
     with pytest.raises(metadatos.FormatoNoSoportado):
-        metadatos.guardar_exif(str(ruta), metadatos.exif_vacio())
+        metadatos.guardar_cambios(str(ruta), Cambios(descripcion="x"))
     assert ruta.read_bytes() == original
     assert [p.name for p in tmp_path.iterdir()] == ["captura.png"]
+
+
+def prueba_archivo_que_no_es_imagen_devuelve_vacio(tmp_path):
+    ruta = tmp_path / "nota.jpg"
+    ruta.write_text("no soy una foto")
+    assert metadatos.leer_metadatos(str(ruta)) == metadatos.Metadatos()

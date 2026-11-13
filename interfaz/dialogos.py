@@ -88,9 +88,11 @@ class DialogoEditar(wx.Dialog):
         self.actualizar_vista_previa()
 
         datos = metadatos.leer_metadatos(ruta)
+        self.datos = datos
         direccion = parent.direcciones.get(ruta, "")
         latitud = str(datos.gps[0]) if datos.gps else ""
         longitud = str(datos.gps[1]) if datos.gps else ""
+        self.coordenadas_iniciales = (latitud, longitud)
 
         self.txt_nombre = self.crear_campo(panel, sizer, "Nombre:", os.path.basename(ruta))
         self.txt_fecha = self.crear_campo(panel, sizer, "Fecha (DD/MM/AAAA):", datos.fecha)
@@ -137,14 +139,18 @@ class DialogoEditar(wx.Dialog):
                 self.parent.cambiar_ruta(self.ruta, nueva_ruta)
                 self.ruta = nueva_ruta
 
-            exif = metadatos.leer_exif(self.ruta)
-            metadatos.poner_descripcion(exif, self.txt_desc.GetValue().strip())
-            metadatos.poner_fecha(exif, self.txt_fecha.GetValue().strip(), self.txt_hora.GetValue().strip())
-            latitud = metadatos.leer_coordenada(self.txt_lat.GetValue())
-            longitud = metadatos.leer_coordenada(self.txt_lon.GetValue())
-            if latitud is not None and longitud is not None:
-                metadatos.poner_gps(exif, latitud, longitud)
-            metadatos.guardar_exif(self.ruta, exif)
+            cambios = metadatos.Cambios(descripcion=self.txt_desc.GetValue().strip())
+            # Fecha y coordenadas solo se escriben si se han cambiado: reescribirlas
+            # sin necesidad redondearía las coordenadas en cada guardado.
+            fecha, hora = self.txt_fecha.GetValue().strip(), self.txt_hora.GetValue().strip()
+            if (fecha, hora) != (self.datos.fecha, self.datos.hora):
+                cambios.fecha, cambios.hora = fecha, hora
+            if (self.txt_lat.GetValue(), self.txt_lon.GetValue()) != self.coordenadas_iniciales:
+                latitud = metadatos.leer_coordenada(self.txt_lat.GetValue())
+                longitud = metadatos.leer_coordenada(self.txt_lon.GetValue())
+                if latitud is not None and longitud is not None:
+                    cambios.gps = (latitud, longitud)
+            metadatos.guardar_cambios(self.ruta, cambios)
 
             self.parent.direcciones[self.ruta] = self.txt_dir.GetValue().strip()
             wx.MessageBox("Datos de la foto editados correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)

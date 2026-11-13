@@ -341,9 +341,7 @@ class VentanaPrincipal(wx.Frame):
             self.enfocar_fila(fila)
             return
         try:
-            exif = metadatos.leer_exif(ruta)
-            metadatos.poner_descripcion(exif, descripcion)
-            metadatos.guardar_exif(ruta, exif)
+            metadatos.guardar_cambios(ruta, metadatos.Cambios(descripcion=descripcion))
         except Exception as e:
             wx.MessageBox("No se pudo guardar la descripción: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
             return
