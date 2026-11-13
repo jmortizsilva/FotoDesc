@@ -127,7 +127,7 @@ class DialogoEditar(wx.Dialog):
             img = img.Scale(200, 200, wx.IMAGE_QUALITY_HIGH)
             self.preview_bitmap.SetBitmap(img.ConvertToBitmap())
         except Exception as e:
-            wx.MessageBox("Error al cargar la vista previa: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            wx.MessageBox("Error al cargar la vista previa: " + str(e), "Error", wx.OK | wx.ICON_ERROR, self)
 
     def on_guardar(self, event):
         nuevo_nombre = self.txt_nombre.GetValue().strip()
@@ -153,10 +153,10 @@ class DialogoEditar(wx.Dialog):
             metadatos.guardar_cambios(self.ruta, cambios)
 
             self.parent.direcciones[self.ruta] = self.txt_dir.GetValue().strip()
-            wx.MessageBox("Datos de la foto editados correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox("Datos de la foto editados correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION, self)
             self.EndModal(wx.ID_OK)
         except Exception as e:
-            wx.MessageBox("Error al guardar los cambios: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            wx.MessageBox("Error al guardar los cambios: " + str(e), "Error", wx.OK | wx.ICON_ERROR, self)
 
     def on_cancelar(self, event):
         self.EndModal(wx.ID_CANCEL)

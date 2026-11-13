@@ -221,6 +221,16 @@ class VentanaPrincipal(wx.Frame):
             dlg.Destroy()
             self.recuperar_foco(foco)
 
+    def avisar(self, mensaje, titulo, estilo):
+        """Muestra un aviso y devuelve el foco adonde estaba.
+
+        Sin la ventana como padre, al cerrar el aviso Windows no devolvía el foco a la
+        lista y había que salir y volver con Alt+Tab.
+        """
+        foco = wx.Window.FindFocus()
+        wx.MessageBox(mensaje, titulo, estilo, self)
+        self.recuperar_foco(foco)
+
     def recuperar_foco(self, foco=None):
         self.Raise()
         if foco and foco.GetTopLevelParent() is self and foco.IsShownOnScreen():
@@ -294,7 +304,7 @@ class VentanaPrincipal(wx.Frame):
             self.preview_bitmap.SetBitmap(img.ConvertToBitmap())
             self.panel_preview.Layout()
         except Exception as e:
-            wx.MessageBox("Error al cargar la vista previa: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("Error al cargar la vista previa: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
 
     def imagen_seleccionada(self):
         """(ruta, fila) de la foto seleccionada, o None.
@@ -311,7 +321,7 @@ class VentanaPrincipal(wx.Frame):
     def on_edit(self, event):
         seleccion = self.imagen_seleccionada()
         if not seleccion:
-            wx.MessageBox("Selecciona una imagen para editar.", "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("Selecciona una imagen para editar.", "Error", wx.OK | wx.ICON_ERROR)
             return
         if self.abrir_modal(DialogoEditar(self, seleccion[0])) == wx.ID_OK:
             self.refrescar_lista()
@@ -319,14 +329,14 @@ class VentanaPrincipal(wx.Frame):
     def on_auto_desc(self, event):
         seleccion = self.imagen_seleccionada()
         if not seleccion:
-            wx.MessageBox("Selecciona una imagen para obtener descripción.", "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("Selecciona una imagen para obtener descripción.", "Error", wx.OK | wx.ICON_ERROR)
             return
         ruta, fila = seleccion
         nombre = os.path.basename(ruta)
         # Se comprueba antes de llamar a la IA para no gastar una petición en vano.
         with open(ruta, "rb") as f:
             if not metadatos.es_jpeg(f.read(2)):
-                wx.MessageBox(str(metadatos.FormatoNoSoportado()), "Error", wx.OK | wx.ICON_ERROR)
+                self.avisar(str(metadatos.FormatoNoSoportado()), "Error", wx.OK | wx.ICON_ERROR)
                 return
         ajustes = configuracion.leer_ajustes()
         clave = claves.leer(ajustes.id_proveedor)
@@ -337,27 +347,27 @@ class VentanaPrincipal(wx.Frame):
             self.enfocar_fila(fila)
             return
         except ErrorIA as e:
-            wx.MessageBox(servicio.texto_error(e, ajustes), "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar(servicio.texto_error(e, ajustes), "Error", wx.OK | wx.ICON_ERROR)
             self.enfocar_fila(fila)
             return
         try:
             metadatos.guardar_cambios(ruta, metadatos.Cambios(descripcion=descripcion))
         except Exception as e:
-            wx.MessageBox("No se pudo guardar la descripción: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("No se pudo guardar la descripción: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
             return
         self.refrescar_lista()
-        wx.MessageBox(f"Descripción guardada, {nombre}", "Confirmación", wx.OK | wx.ICON_INFORMATION)
+        self.avisar(f"Descripción guardada, {nombre}", "Confirmación", wx.OK | wx.ICON_INFORMATION)
         self.enfocar_fila(fila)
 
     def on_address(self, event):
         seleccion = self.imagen_seleccionada()
         if not seleccion:
-            wx.MessageBox("Selecciona una imagen para obtener la dirección.", "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("Selecciona una imagen para obtener la dirección.", "Error", wx.OK | wx.ICON_ERROR)
             return
         ruta, fila = seleccion
         datos = metadatos.leer_metadatos(ruta)
         if not datos.gps:
-            wx.MessageBox("No hay datos de latitud y longitud.", "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("No hay datos de latitud y longitud.", "Error", wx.OK | wx.ICON_ERROR)
             return
         latitud, longitud = datos.gps
         parametros = {"format": "json", "lat": latitud, "lon": longitud, "zoom": 18, "addressdetails": 1}
@@ -366,19 +376,19 @@ class VentanaPrincipal(wx.Frame):
             respuesta = requests.get("https://nominatim.openstreetmap.org/reverse",
                                      params=parametros, headers=cabeceras, timeout=10)
             if respuesta.status_code != 200:
-                wx.MessageBox("Error al obtener la dirección. Código: " + str(respuesta.status_code),
+                self.avisar("Error al obtener la dirección. Código: " + str(respuesta.status_code),
                               "Error", wx.OK | wx.ICON_ERROR)
                 return
             direccion = respuesta.json().get("display_name", "")
             if direccion:
                 self.direcciones[ruta] = direccion
                 self.refrescar_lista()
-                wx.MessageBox("Dirección obtenida correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
+                self.avisar("Dirección obtenida correctamente", "Confirmación", wx.OK | wx.ICON_INFORMATION)
                 self.enfocar_fila(fila)
             else:
-                wx.MessageBox("No se encontró dirección.", "Información", wx.OK | wx.ICON_INFORMATION)
+                self.avisar("No se encontró dirección.", "Información", wx.OK | wx.ICON_INFORMATION)
         except Exception as e:
-            wx.MessageBox("Error en la conexión: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
+            self.avisar("Error en la conexión: " + str(e), "Error", wx.OK | wx.ICON_ERROR)
 
     def enfocar_fila(self, fila):
         estado = wx.LIST_STATE_SELECTED | wx.LIST_STATE_FOCUSED

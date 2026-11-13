@@ -91,3 +91,13 @@ def prueba_recorrer_columnas_anuncia_nombre_y_valor(ventana, fotos, monkeypatch)
     assert dichos[-1] == "Nombre, foto0.jpg"
     ventana.mover_columna(-1)  # Ya en la primera: pitido y nada más
     assert pitidos == [1] and len(dichos) == 3
+
+
+def prueba_los_avisos_tienen_padre_y_devuelven_el_foco(ventana, monkeypatch):
+    # En Windows, tras "Descripción guardada" el foco no volvía a la lista.
+    llamadas, recuperaciones = [], []
+    monkeypatch.setattr(wx, "MessageBox", lambda *args: llamadas.append(args))
+    monkeypatch.setattr(ventana, "recuperar_foco", lambda foco=None: recuperaciones.append(1))
+    ventana.avisar("Descripción guardada, a.jpg", "Confirmación", wx.OK)
+    assert llamadas[0][3] is ventana
+    assert recuperaciones == [1]
