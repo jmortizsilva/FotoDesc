@@ -209,20 +209,36 @@ class VentanaPrincipal(wx.Frame):
         self.PopupMenu(menu, pos)
         menu.Destroy()
 
+    def abrir_modal(self, dlg):
+        """Abre el diálogo y, al cerrarlo, devuelve la ventana y el foco a donde estaban.
+
+        En Windows, tras un diálogo abierto desde un menú emergente, la ventana principal
+        no recuperaba el foco y había que salir y volver con Alt+Tab.
+        """
+        foco = wx.Window.FindFocus()
+        try:
+            return dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+            self.recuperar_foco(foco)
+
+    def recuperar_foco(self, foco=None):
+        self.Raise()
+        if foco and foco.GetTopLevelParent() is self and foco.IsShownOnScreen():
+            foco.SetFocus()
+        elif self.list_panel.IsShown() and self.list_ctrl.GetItemCount() > 0:
+            self.list_ctrl.SetFocus()
+        elif self.start_panel.IsShown():
+            self.start_panel.SetFocus()
+
     def on_about(self, event):
-        dlg = DialogoAcercaDe(self)
-        dlg.ShowModal()
-        dlg.Destroy()
+        self.abrir_modal(DialogoAcercaDe(self))
 
     def mostrar_ayuda(self, event):
-        dlg = DialogoAyuda(self)
-        dlg.ShowModal()
-        dlg.Destroy()
+        self.abrir_modal(DialogoAyuda(self))
 
     def mostrar_dialogo_ia(self, event):
-        dlg = DialogoIA(self)
-        dlg.ShowModal()
-        dlg.Destroy()
+        self.abrir_modal(DialogoIA(self))
 
     def anadir_imagenes(self, rutas):
         # La lista se monta una sola vez al final: montarla por cada foto leía los
@@ -301,10 +317,8 @@ class VentanaPrincipal(wx.Frame):
         if not seleccion:
             wx.MessageBox("Selecciona una imagen para editar.", "Error", wx.OK | wx.ICON_ERROR)
             return
-        dlg = DialogoEditar(self, seleccion[0])
-        if dlg.ShowModal() == wx.ID_OK:
+        if self.abrir_modal(DialogoEditar(self, seleccion[0])) == wx.ID_OK:
             self.refrescar_lista()
-        dlg.Destroy()
 
     def on_auto_desc(self, event):
         seleccion = self.imagen_seleccionada()

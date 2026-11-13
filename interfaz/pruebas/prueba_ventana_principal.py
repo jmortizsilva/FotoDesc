@@ -48,3 +48,29 @@ def prueba_no_pide_el_foco_con_la_lista_oculta(ventana, fotos, monkeypatch):
     assert not ventana.list_panel.IsShown()
     ventana.anadir_imagenes(fotos)
     assert peticiones == []
+
+
+class DialogoFalso:
+    def __init__(self, resultado=None, error=None):
+        self.resultado, self.error, self.destruido = resultado, error, False
+
+    def ShowModal(self):
+        if self.error:
+            raise self.error
+        return self.resultado
+
+    def Destroy(self):
+        self.destruido = True
+
+
+def prueba_abrir_modal_devuelve_el_foco_siempre(ventana, monkeypatch):
+    # En Windows, al cerrar el diálogo de IA el foco no volvía a la ventana principal.
+    recuperaciones = []
+    monkeypatch.setattr(ventana, "recuperar_foco", lambda foco=None: recuperaciones.append(1))
+    dlg = DialogoFalso(resultado=wx.ID_OK)
+    assert ventana.abrir_modal(dlg) == wx.ID_OK
+    dlg_roto = DialogoFalso(error=RuntimeError("fallo"))
+    with pytest.raises(RuntimeError):
+        ventana.abrir_modal(dlg_roto)
+    assert dlg.destruido and dlg_roto.destruido
+    assert recuperaciones == [1, 1]

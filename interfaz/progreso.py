@@ -21,6 +21,7 @@ def ejecutar_con_progreso(padre, titulo, funcion):
         except BaseException as e:
             resultado["error"] = e
 
+    foco = wx.Window.FindFocus()
     hilo = threading.Thread(target=trabajo, daemon=True)
     hilo.start()
     dialogo = wx.ProgressDialog(titulo, titulo, parent=padre,
@@ -33,6 +34,11 @@ def ejecutar_con_progreso(padre, titulo, funcion):
             wx.MilliSleep(100)
     finally:
         dialogo.Destroy()
+        # Al cerrarse la ventana de progreso, Windows no devuelve el foco a la que
+        # la abrió: el lector se queda sin ventana activa.
+        padre.GetTopLevelParent().Raise()
+        if foco:
+            foco.SetFocus()
     if "error" in resultado:
         raise resultado["error"]
     return resultado.get("valor")
