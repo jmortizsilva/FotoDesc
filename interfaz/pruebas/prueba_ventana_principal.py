@@ -74,3 +74,20 @@ def prueba_abrir_modal_devuelve_el_foco_siempre(ventana, monkeypatch):
         ventana.abrir_modal(dlg_roto)
     assert dlg.destruido and dlg_roto.destruido
     assert recuperaciones == [1, 1]
+
+
+def prueba_recorrer_columnas_anuncia_nombre_y_valor(ventana, fotos, monkeypatch):
+    dichos, pitidos = [], []
+    monkeypatch.setattr("interfaz.voz.anunciar", lambda texto: dichos.append(texto))
+    monkeypatch.setattr(wx, "Bell", lambda: pitidos.append(1))
+    ventana.anadir_imagenes(fotos[:1])
+    ventana.list_ctrl.Select(0)
+
+    ventana.mover_columna(1)
+    ventana.mover_columna(1)
+    assert dichos == ["Descripción, sin datos", "Fecha, sin datos"]
+
+    ventana.leer_columna(0)
+    assert dichos[-1] == "Nombre, foto0.jpg"
+    ventana.mover_columna(-1)  # Ya en la primera: pitido y nada más
+    assert pitidos == [1] and len(dichos) == 3

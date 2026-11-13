@@ -5,3 +5,4 @@ requests>=2.31
 pillow-heif>=0.16
 keyring>=25
 anthropic>=0.125
+accessible_output2>=0.17; sys_platform == "win32"

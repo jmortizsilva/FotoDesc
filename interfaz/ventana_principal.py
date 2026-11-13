@@ -9,7 +9,8 @@ from interfaz import configuracion
 from interfaz.dialogo_ia import DialogoIA
 from interfaz.dialogos import DialogoAcercaDe, DialogoAyuda, DialogoEditar
 from interfaz.progreso import Cancelado, ejecutar_con_progreso
-from logica import metadatos
+from interfaz import voz
+from logica import columnas, metadatos
 
 EXTENSIONES = (".jpg", ".jpeg", ".png", ".bmp", ".gif", ".heif", ".heic")
 
@@ -36,6 +37,7 @@ class VentanaPrincipal(wx.Frame):
         super().__init__(parent, title="FotoDesc", size=(1000, 700))
         self.imagenes = []     # Rutas, en el mismo orden que las filas de la lista
         self.direcciones = {}  # Ruta -> dirección obtenida o escrita a mano
+        self.columna = 0       # Columna en la que está quien recorre la lista con izquierda/derecha
         self.InitUI()
         self.SetAcceleratorTable(wx.AcceleratorTable([
             (wx.ACCEL_ALT, ord("I"), self.id_add_image),
@@ -105,12 +107,9 @@ class VentanaPrincipal(wx.Frame):
         list_sizer = wx.BoxSizer(wx.VERTICAL)
         self.list_ctrl = wx.ListCtrl(panel_list, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
         self.list_ctrl.SetToolTip("Listado de imágenes")
-        self.list_ctrl.InsertColumn(0, "Archivo", width=200)
-        self.list_ctrl.InsertColumn(1, "Descripción", width=200)
-        self.list_ctrl.InsertColumn(2, "Localización", width=150)
-        self.list_ctrl.InsertColumn(3, "Dirección", width=200)
-        self.list_ctrl.InsertColumn(4, "Fecha", width=100)
-        self.list_ctrl.InsertColumn(5, "Hora", width=100)
+        anchos = [180, 320, 150, 80, 150, 250]
+        for indice, (titulo, ancho) in enumerate(zip(columnas.COLUMNAS, anchos)):
+            self.list_ctrl.InsertColumn(indice, titulo, width=ancho)
         list_sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 5)
 
         btn_panel = wx.Panel(panel_list)
@@ -259,14 +258,11 @@ class VentanaPrincipal(wx.Frame):
         seleccionada = self.list_ctrl.GetFirstSelected()
         self.list_ctrl.DeleteAllItems()
         for ruta in self.imagenes:
-            datos = metadatos.leer_metadatos(ruta)
-            localizacion = f"{datos.gps[0]:.6f}, {datos.gps[1]:.6f}" if datos.gps else ""
-            fila = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), os.path.basename(ruta))
-            self.list_ctrl.SetItem(fila, 1, datos.descripcion)
-            self.list_ctrl.SetItem(fila, 2, localizacion)
-            self.list_ctrl.SetItem(fila, 3, self.direcciones.get(ruta, ""))
-            self.list_ctrl.SetItem(fila, 4, datos.fecha)
-            self.list_ctrl.SetItem(fila, 5, datos.hora)
+            valores = columnas.valores_fila(os.path.basename(ruta), metadatos.leer_metadatos(ruta),
+                                            self.direcciones.get(ruta, ""))
+            fila = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), valores[0])
+            for indice, valor in enumerate(valores[1:], start=1):
+                self.list_ctrl.SetItem(fila, indice, valor)
         if self.list_ctrl.GetItemCount() == 0:
             return
         if seleccionada == -1 or seleccionada >= self.list_ctrl.GetItemCount():
@@ -399,10 +395,31 @@ class VentanaPrincipal(wx.Frame):
         self.mostrar_menu_contextual()
 
     def on_list_key_down(self, event):
-        if event.GetKeyCode() == wx.WXK_RETURN:
+        tecla = event.GetKeyCode()
+        modificadores = event.GetModifiers()
+        if tecla == wx.WXK_RETURN:
             self.mostrar_menu_contextual()
+        elif tecla in (wx.WXK_LEFT, wx.WXK_RIGHT) and modificadores == wx.MOD_NONE:
+            self.mover_columna(-1 if tecla == wx.WXK_LEFT else 1)
+        elif (modificadores == wx.MOD_CONTROL
+              and ord("1") <= tecla < ord("1") + len(columnas.COLUMNAS)):
+            self.leer_columna(tecla - ord("1"))
         else:
             event.Skip()
+
+    def mover_columna(self, paso):
+        self.columna, en_extremo = columnas.mover(self.columna, paso)
+        if en_extremo:
+            wx.Bell()
+            return
+        self.leer_columna(self.columna)
+
+    def leer_columna(self, columna):
+        fila = self.list_ctrl.GetFirstSelected()
+        if fila == -1:
+            return
+        self.columna = columna
+        voz.anunciar(columnas.anuncio(columna, self.list_ctrl.GetItemText(fila, columna)))
 
     def mostrar_menu_contextual(self):
         seleccion = self.imagen_seleccionada()
